@@ -1,21 +1,45 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Dark mode is driven by `data-theme` on <html>, which the boot script in
+   layout.tsx resolves from the user's saved choice or the OS preference. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 :root {
+  color-scheme: light;
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827;
+  --desk: #e5e7eb;
+  --scrollbar-thumb: #d1d5db;
+  --scrollbar-thumb-hover: #9ca3af;
+  --chart-grid: #e5e7eb;
+  --chart-label: #6b7280;
+  --paper-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
+/* Fallback for environments where the boot script never runs. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #030712;
+    --foreground: #f3f4f6;
   }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #030712;
+  --foreground: #f3f4f6;
+  --desk: #111827;
+  --scrollbar-thumb: #4b5563;
+  --scrollbar-thumb-hover: #6b7280;
+  --chart-grid: #374151;
+  --chart-label: #9ca3af;
+  --paper-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 body {
@@ -38,18 +62,18 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--scrollbar-thumb);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* For Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #d1d5db transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 /* Keep side panels scrollable without placing a visible rail between columns. */
@@ -64,9 +88,11 @@ body {
   height: 0;
 }
 
-/* Word Document Preview Styling */
+/* Word Document Preview Styling.
+   The page itself always stays paper-white — it is a preview of the .docx
+   the user will download — only the "desk" behind it follows the theme. */
 .word-preview-container {
-  background-color: #e5e7eb; /* gray-200 background simulating a desk */
+  background-color: var(--desk);
   padding: 2rem;
 }
 
@@ -75,7 +101,7 @@ body {
   width: 100%;
   max-width: 794px; /* A4 width at 96 DPI */
   min-height: 1123px; /* A4 height at 96 DPI */
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0,0,0,0.05);
+  box-shadow: var(--paper-shadow);
   padding: 60px 80px; /* Adjusted margins */
   margin: 0 auto;
   border-radius: 2px;
@@ -102,6 +128,12 @@ body {
 .mermaid-diagram svg {
   display: block;
   height: auto;
+}
+
+/* Mermaid bakes a background colour into its SVG; let the surrounding card
+   show through instead so the diagram matches the theme. */
+.mermaid-diagram svg {
+  background: transparent !important;
 }
 
 /* 隐藏 Mermaid 渲染错误信息（图示正常显示，错误文字不显示） */

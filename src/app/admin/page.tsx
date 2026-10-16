@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
+import ThemeToggle from '@/components/theme-toggle';
 
 type EnvStatus = {
   deepseek: boolean;
@@ -96,8 +97,8 @@ function TrafficTrendChart({ days }: { days: TrafficDay[] }) {
           const gridY = bottom - ratio * (bottom - top);
           return (
             <g key={ratio}>
-              <line x1="42" x2="350" y1={gridY} y2={gridY} stroke="#e5e7eb" strokeWidth="1" />
-              <text x="36" y={gridY + 4} textAnchor="end" fill="#6b7280" fontSize="11">
+              <line x1="42" x2="350" y1={gridY} y2={gridY} stroke="var(--chart-grid)" strokeWidth="1" />
+              <text x="36" y={gridY + 4} textAnchor="end" fill="var(--chart-label)" fontSize="11">
                 {Math.round(maxValue * ratio)}
               </text>
             </g>
@@ -113,11 +114,11 @@ function TrafficTrendChart({ days }: { days: TrafficDay[] }) {
             <circle cx={x(index)} cy={y(day.uniqueVisitors)} r="3.5" fill="#059669">
               <title>{`${day.date} UV ${day.uniqueVisitors}`}</title>
             </circle>
-            <text x={x(index)} y="184" textAnchor="middle" fill="#6b7280" fontSize="11">{formatChartDate(day.date)}</text>
+            <text x={x(index)} y="184" textAnchor="middle" fill="var(--chart-label)" fontSize="11">{formatChartDate(day.date)}</text>
           </g>
         ))}
       </svg>
-      <div className="mt-1 flex justify-center gap-5 text-xs text-gray-600">
+      <div className="mt-1 flex justify-center gap-5 text-xs text-gray-600 dark:text-gray-400">
         <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-indigo-600" />PV 页面访问</span>
         <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-emerald-600" />UV 独立访客估算</span>
       </div>
@@ -142,8 +143,8 @@ function RequestTrendChart({ days }: { days: RequestDay[] }) {
           const gridY = bottom - ratio * (bottom - top);
           return (
             <g key={ratio}>
-              <line x1="42" x2="350" y1={gridY} y2={gridY} stroke="#e5e7eb" strokeWidth="1" />
-              <text x="36" y={gridY + 4} textAnchor="end" fill="#6b7280" fontSize="11">{Math.round(maxValue * ratio)}</text>
+              <line x1="42" x2="350" y1={gridY} y2={gridY} stroke="var(--chart-grid)" strokeWidth="1" />
+              <text x="36" y={gridY + 4} textAnchor="end" fill="var(--chart-label)" fontSize="11">{Math.round(maxValue * ratio)}</text>
             </g>
           );
         })}
@@ -155,11 +156,11 @@ function RequestTrendChart({ days }: { days: RequestDay[] }) {
             <rect x={x(index) + 3} y={bottom - height(day.download)} width="12" height={height(day.download)} rx="2" fill="#0ea5e9">
               <title>{`${day.date} 下载 ${day.download} 次`}</title>
             </rect>
-            <text x={x(index)} y="184" textAnchor="middle" fill="#6b7280" fontSize="11">{formatChartDate(day.date)}</text>
+            <text x={x(index)} y="184" textAnchor="middle" fill="var(--chart-label)" fontSize="11">{formatChartDate(day.date)}</text>
           </g>
         ))}
       </svg>
-      <div className="mt-1 flex justify-center gap-5 text-xs text-gray-600">
+      <div className="mt-1 flex justify-center gap-5 text-xs text-gray-600 dark:text-gray-400">
         <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-indigo-600" />文档生成</span>
         <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-sky-500" />文档下载</span>
       </div>
@@ -175,14 +176,14 @@ function RequestOutcomeBar({ label, total, success, errors }: { label: string; t
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium text-gray-800">{label}</span>
-        <span className="text-gray-600">{total} 次 · 成功率 {successRate}%</span>
+        <span className="font-medium text-gray-800 dark:text-gray-200">{label}</span>
+        <span className="text-gray-600 dark:text-gray-400">{total} 次 · 成功率 {successRate}%</span>
       </div>
-      <div className="flex h-3 overflow-hidden rounded-full bg-gray-100" role="img" aria-label={`${label}成功 ${success} 次，失败 ${errors} 次`}>
+      <div className="flex h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800" role="img" aria-label={`${label}成功 ${success} 次，失败 ${errors} 次`}>
         <div className="bg-emerald-500" style={{ width: `${successWidth}%` }} />
         <div className="bg-rose-500" style={{ width: `${errorWidth}%` }} />
       </div>
-      <div className="flex justify-between text-xs text-gray-500">
+      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>成功 {success}</span>
         <span>失败 {errors}</span>
       </div>
@@ -222,7 +223,7 @@ function PieChart({ title, data }: { title: string; data: PieDatum[] }) {
         <title>{title}饼图</title>
         <desc>{data.map((item) => `${item.label} ${item.value} 次`).join('；')}</desc>
         {total === 0 ? (
-          <circle cx="90" cy="90" r="76" fill="#e5e7eb" />
+          <circle cx="90" cy="90" r="76" fill="var(--chart-grid)" />
         ) : slices.length === 1 ? (
           <circle cx="90" cy="90" r="76" fill={slices[0].color}>
             <title>{`${slices[0].label}: ${slices[0].value}`}</title>
@@ -236,12 +237,12 @@ function PieChart({ title, data }: { title: string; data: PieDatum[] }) {
       <ul className="w-full space-y-2 text-sm">
         {data.map((item) => (
           <li key={item.label} className="flex items-center justify-between gap-3">
-            <span className="inline-flex min-w-0 items-center gap-2 text-gray-600">
+            <span className="inline-flex min-w-0 items-center gap-2 text-gray-600 dark:text-gray-400">
               <i className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
               <span>{item.label}</span>
             </span>
-            <span className="shrink-0 font-medium tabular-nums text-gray-900">
-              {item.value} <span className="font-normal text-gray-500">{total ? `${((item.value / total) * 100).toFixed(1)}%` : '0%'}</span>
+            <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
+              {item.value} <span className="font-normal text-gray-500 dark:text-gray-400">{total ? `${((item.value / total) * 100).toFixed(1)}%` : '0%'}</span>
             </span>
           </li>
         ))}
@@ -266,8 +267,8 @@ function HourlyActivityChart({ data }: { data: Array<{ hour: number; requests: n
         const gridY = bottom - ratio * (bottom - top);
         return (
           <g key={ratio}>
-            <line x1="26" x2="340" y1={gridY} y2={gridY} stroke="#e5e7eb" strokeWidth="1" />
-            <text x="22" y={gridY + 4} textAnchor="end" fill="#6b7280" fontSize="11">{Math.round(maxRequests * ratio)}</text>
+            <line x1="26" x2="340" y1={gridY} y2={gridY} stroke="var(--chart-grid)" strokeWidth="1" />
+            <text x="22" y={gridY + 4} textAnchor="end" fill="var(--chart-label)" fontSize="11">{Math.round(maxRequests * ratio)}</text>
           </g>
         );
       })}
@@ -277,7 +278,7 @@ function HourlyActivityChart({ data }: { data: Array<{ hour: number; requests: n
             <title>{`${String(item.hour).padStart(2, '0')}:00 UTC · ${item.requests} 次请求`}</title>
           </rect>
           {item.hour % 3 === 0 ? (
-            <text x={x(item.hour) + barWidth / 2} y="164" textAnchor="middle" fill="#6b7280" fontSize="11">
+            <text x={x(item.hour) + barWidth / 2} y="164" textAnchor="middle" fill="var(--chart-label)" fontSize="11">
               {String(item.hour).padStart(2, '0')}
             </text>
           ) : null}
@@ -368,34 +369,37 @@ export default function AdminPage() {
   }, [payload]);
 
   return (
-    <div className="min-h-screen w-full min-w-0 overflow-x-clip bg-gray-50 py-5 sm:py-8">
+    <div className="min-h-screen w-full min-w-0 overflow-x-clip bg-gray-50 dark:bg-gray-950 py-5 sm:py-8">
       <div className="mx-auto w-full min-w-0 max-w-6xl px-3 sm:px-4">
         <div className="mb-6 flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">管理后台</h1>
-            <p className="mt-1 text-sm text-gray-500">用于查看运行状态、接口可用性与最近请求记录</p>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">管理后台</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">用于查看运行状态、接口可用性与最近请求记录</p>
           </div>
-          <Link href="/" className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
-            返回首页
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle locale="zh" />
+            <Link href="/" className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+              返回首页
+            </Link>
+          </div>
         </div>
 
         {!authorized ? (
-          <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center gap-2 text-gray-800">
-              <ShieldCheck className="h-5 w-5 text-indigo-600" />
+          <div className="mx-auto max-w-md rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+              <ShieldCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <span className="font-semibold">管理员登录</span>
             </div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">管理密码</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">管理密码</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               placeholder="请输入管理密码"
             />
             {error ? (
-              <div className="mt-3 flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              <div className="mt-3 flex items-center gap-2 rounded-md border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30 px-3 py-2 text-sm text-rose-700 dark:text-rose-400">
                 <TriangleAlert className="h-4 w-4" />
                 <span>{error}</span>
               </div>
@@ -408,46 +412,46 @@ export default function AdminPage() {
             >
               {loading ? '登录中...' : '登录后台'}
             </button>
-            <p className="mt-3 text-xs text-gray-500">可通过环境变量 ADMIN_PASSWORD 修改后台密码。</p>
+            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">可通过环境变量 ADMIN_PASSWORD 修改后台密码。</p>
           </div>
         ) : (
           <div className="space-y-6">
             <div className="grid min-w-0 gap-4 md:grid-cols-4 [&>*]:min-w-0">
-              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="text-sm text-gray-500">总请求数</div>
-                <div className="mt-2 text-3xl font-bold text-gray-900">{payload?.overview.totalRequests ?? 0}</div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                <div className="text-sm text-gray-500 dark:text-gray-400">总请求数</div>
+                <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">{payload?.overview.totalRequests ?? 0}</div>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="text-sm text-gray-500">总访问量（PV）</div>
-                <div className="mt-2 text-3xl font-bold text-gray-900">{payload?.overview.traffic.totalVisits ?? 0}</div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                <div className="text-sm text-gray-500 dark:text-gray-400">总访问量（PV）</div>
+                <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">{payload?.overview.traffic.totalVisits ?? 0}</div>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="text-sm text-gray-500">今日访问量</div>
-                <div className="mt-2 text-3xl font-bold text-indigo-600">{payload?.overview.traffic.todayVisits ?? 0}</div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                <div className="text-sm text-gray-500 dark:text-gray-400">今日访问量</div>
+                <div className="mt-2 text-3xl font-bold text-indigo-600 dark:text-indigo-400">{payload?.overview.traffic.todayVisits ?? 0}</div>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="text-sm text-gray-500">独立访客估算（UV）</div>
-                <div className="mt-2 text-3xl font-bold text-emerald-600">{payload?.overview.traffic.uniqueVisitors ?? 0}</div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                <div className="text-sm text-gray-500 dark:text-gray-400">独立访客估算（UV）</div>
+                <div className="mt-2 text-3xl font-bold text-emerald-600 dark:text-emerald-400">{payload?.overview.traffic.uniqueVisitors ?? 0}</div>
               </div>
             </div>
 
-            <section className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5" aria-labelledby="accounts-title">
+            <section className="min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 shadow-sm sm:p-5" aria-labelledby="accounts-title">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 id="accounts-title" className="font-semibold text-gray-800">用户管理</h2>
-                  <p className="mt-1 text-xs text-gray-500">账号信息、登录情况及关联的生成/下载次数</p>
+                  <h2 id="accounts-title" className="font-semibold text-gray-800 dark:text-gray-200">用户管理</h2>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">账号信息、登录情况及关联的生成/下载次数</p>
                 </div>
-                <div className="flex gap-3 text-xs text-gray-600 sm:text-sm">
+                <div className="flex gap-3 text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
                   <span>总用户 {accountAnalytics?.total ?? 0}</span>
                   <span>活跃 {accountAnalytics?.active ?? 0}</span>
                   <span>今日新增 {accountAnalytics?.today ?? 0}</span>
                 </div>
               </div>
-              {accountError && <p role="alert" className="mb-3 text-sm text-rose-600">{accountError}</p>}
+              {accountError && <p role="alert" className="mb-3 text-sm text-rose-600 dark:text-rose-400">{accountError}</p>}
               <div className="overflow-x-auto">
                 <table className="min-w-[760px] w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 text-left text-gray-500">
+                    <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500 dark:text-gray-400">
                       <th className="px-2 py-2">邮箱</th>
                       <th className="px-2 py-2">注册时间</th>
                       <th className="px-2 py-2">最近登录</th>
@@ -460,35 +464,35 @@ export default function AdminPage() {
                   </thead>
                   <tbody>
                     {(accountAnalytics?.users || []).map((account) => (
-                      <tr key={account.id} className="border-b border-gray-100 text-gray-700">
+                      <tr key={account.id} className="border-b border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300">
                         <td className="px-2 py-2">{account.email}</td>
                         <td className="whitespace-nowrap px-2 py-2">{formatDateTime(account.createdAt)}</td>
                         <td className="whitespace-nowrap px-2 py-2">{account.lastLoginAt ? formatDateTime(account.lastLoginAt) : '尚未登录'}</td>
-                        <td className="px-2 py-2"><span className={account.emailVerified ? 'text-emerald-600' : 'text-amber-600'}>{account.emailVerified ? '已验证' : '待验证'}</span></td>
+                        <td className="px-2 py-2"><span className={account.emailVerified ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{account.emailVerified ? '已验证' : '待验证'}</span></td>
                         <td className="px-2 py-2 text-right tabular-nums">{Number(account.generations) || 0}</td>
                         <td className="px-2 py-2 text-right tabular-nums">{Number(account.downloads) || 0}</td>
-                        <td className="px-2 py-2"><span className={account.status === 'active' ? 'text-emerald-600' : 'text-rose-600'}>{account.status === 'active' ? '正常' : '已停用'}</span></td>
+                        <td className="px-2 py-2"><span className={account.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>{account.status === 'active' ? '正常' : '已停用'}</span></td>
                         <td className="px-2 py-2">
-                          <button type="button" onClick={() => toggleAccountStatus(account)} className="text-indigo-600 hover:text-indigo-800">
+                          <button type="button" onClick={() => toggleAccountStatus(account)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
                             {account.status === 'active' ? '停用' : '启用'}
                           </button>
                         </td>
                       </tr>
                     ))}
-                    {!accountAnalytics?.users.length && <tr><td colSpan={8} className="px-2 py-8 text-center text-gray-500">暂无注册用户</td></tr>}
+                    {!accountAnalytics?.users.length && <tr><td colSpan={8} className="px-2 py-8 text-center text-gray-500 dark:text-gray-400">暂无注册用户</td></tr>}
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 text-xs text-gray-500">最多显示最近注册的 200 个账号；停用会撤销登录会话，但不会影响该访客匿名使用公共功能。</p>
+              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">最多显示最近注册的 200 个账号；停用会撤销登录会话，但不会影响该访客匿名使用公共功能。</p>
             </section>
 
             <div className="grid min-w-0 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
-              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-gray-800">
-                  <Activity className="h-5 w-5 text-indigo-600" />
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                  <Activity className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   <span className="font-semibold">接口统计</span>
                 </div>
-                <div className="space-y-2 text-sm text-gray-700">
+                <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                   <div>生成接口：总 {payload?.overview.generate.total ?? 0}，成功 {payload?.overview.generate.success ?? 0}，失败 {payload?.overview.generate.error ?? 0}</div>
                   <div>下载接口：总 {payload?.overview.download.total ?? 0}，成功 {payload?.overview.download.success ?? 0}，失败 {payload?.overview.download.error ?? 0}</div>
                   <div>生成成功率：{payload?.overview.generate.successRate ?? 0}%</div>
@@ -498,58 +502,58 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-gray-800">
-                  <ShieldCheck className="h-5 w-5 text-indigo-600" />
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                  <ShieldCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   <span className="font-semibold">核心服务状态</span>
                 </div>
                 <div className="space-y-1 text-sm">
-                  <p className={payload?.envStatus.deepseek ? 'text-emerald-700' : 'text-rose-700'}>AI 生成：{payload?.envStatus.deepseek ? '已就绪' : '未配置'}</p>
-                  <p className={payload?.envStatus.smtp ? 'text-emerald-700' : 'text-amber-700'}>验证邮件：{payload?.envStatus.smtp ? '已配置' : '未配置 SMTP 密钥'}</p>
+                  <p className={payload?.envStatus.deepseek ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}>AI 生成：{payload?.envStatus.deepseek ? '已就绪' : '未配置'}</p>
+                  <p className={payload?.envStatus.smtp ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}>验证邮件：{payload?.envStatus.smtp ? '已配置' : '未配置 SMTP 密钥'}</p>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">仅显示服务状态，不展示部署变量或密钥</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">仅显示服务状态，不展示部署变量或密钥</p>
               </div>
             </div>
 
             <div className="grid min-w-0 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
-              <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="traffic-chart-title">
-                <div className="mb-2 flex items-center gap-2 text-gray-800">
-                  <Activity className="h-5 w-5 text-indigo-600" />
+              <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm" aria-labelledby="traffic-chart-title">
+                <div className="mb-2 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                  <Activity className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   <h2 id="traffic-chart-title" className="font-semibold">访问趋势（近7天）</h2>
                 </div>
-                <p className="mb-2 text-xs text-gray-500">今日 PV {payload?.overview.traffic.todayVisits ?? 0} · UV 估算 {payload?.overview.traffic.todayUniqueVisitors ?? 0}</p>
+                <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">今日 PV {payload?.overview.traffic.todayVisits ?? 0} · UV 估算 {payload?.overview.traffic.todayUniqueVisitors ?? 0}</p>
                 <TrafficTrendChart days={trendRows} />
               </section>
 
-              <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="request-chart-title">
-                <div className="mb-2 flex items-center gap-2 text-gray-800">
-                  <Activity className="h-5 w-5 text-sky-600" />
+              <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm" aria-labelledby="request-chart-title">
+                <div className="mb-2 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                  <Activity className="h-5 w-5 text-sky-600 dark:text-sky-400" />
                   <h2 id="request-chart-title" className="font-semibold">接口调用趋势（近7天）</h2>
                 </div>
-                <p className="mb-2 text-xs text-gray-500">按日比较文档生成与下载接口请求次数</p>
+                <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">按日比较文档生成与下载接口请求次数</p>
                 <RequestTrendChart days={trendRows} />
               </section>
             </div>
 
             <section aria-label="业务结构分析">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">业务结构分析</h2>
+              <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">业务结构分析</h2>
               <div className="grid min-w-0 gap-6 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
-                <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <h3 className="mb-4 font-semibold text-gray-800">请求类型占比</h3>
+                <article className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                  <h3 className="mb-4 font-semibold text-gray-800 dark:text-gray-200">请求类型占比</h3>
                   <PieChart title="请求类型占比" data={[
                     { label: '文档生成', value: payload?.overview.generate.total ?? 0, color: '#4f46e5' },
                     { label: '文档下载', value: payload?.overview.download.total ?? 0, color: '#0ea5e9' },
                   ]} />
                 </article>
-                <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <h3 className="mb-4 font-semibold text-gray-800">请求结果占比</h3>
+                <article className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                  <h3 className="mb-4 font-semibold text-gray-800 dark:text-gray-200">请求结果占比</h3>
                   <PieChart title="成功与失败请求占比" data={[
                     { label: '成功', value: payload?.overview.requestInsights.success ?? 0, color: '#059669' },
                     { label: '失败', value: payload?.overview.requestInsights.errors ?? 0, color: '#e11d48' },
                   ]} />
                 </article>
-                <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <h3 className="mb-4 font-semibold text-gray-800">生成输入方式占比</h3>
+                <article className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                  <h3 className="mb-4 font-semibold text-gray-800 dark:text-gray-200">生成输入方式占比</h3>
                   <PieChart title="带图片与纯文本生成请求占比" data={[
                     { label: '图片输入', value: payload?.overview.requestInsights.generateWithImages ?? 0, color: '#f59e0b' },
                     { label: '纯文本', value: payload?.overview.requestInsights.generateTextOnly ?? 0, color: '#6366f1' },
@@ -558,22 +562,22 @@ export default function AdminPage() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="hourly-chart-title">
-              <div className="mb-2 flex items-center gap-2 text-gray-800">
-                <Activity className="h-5 w-5 text-violet-600" />
+            <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm" aria-labelledby="hourly-chart-title">
+              <div className="mb-2 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                <Activity className="h-5 w-5 text-violet-600 dark:text-violet-400" />
                 <h2 id="hourly-chart-title" className="font-semibold">小时活跃度（近30天）</h2>
               </div>
-              <p className="mb-2 text-xs text-gray-500">按 UTC 小时统计生成与下载请求，用于观察一天内的使用时段分布</p>
+              <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">按 UTC 小时统计生成与下载请求，用于观察一天内的使用时段分布</p>
               <HourlyActivityChart data={payload?.overview.requestInsights.hourlyRequests ?? []} />
             </section>
 
             <div className="grid min-w-0 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
-              <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="request-outcome-title">
-                <div className="mb-5 flex items-center gap-2 text-gray-800">
-                  <Activity className="h-5 w-5 text-emerald-600" />
+              <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm" aria-labelledby="request-outcome-title">
+                <div className="mb-5 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                  <Activity className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   <h2 id="request-outcome-title" className="font-semibold">接口成功率与结果分布</h2>
                 </div>
-                <div className="mb-4 flex gap-4 text-xs text-gray-500">
+                <div className="mb-4 flex gap-4 text-xs text-gray-500 dark:text-gray-400">
                   <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" />成功</span>
                   <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-rose-500" />失败</span>
                 </div>
@@ -583,15 +587,15 @@ export default function AdminPage() {
                 </div>
               </section>
 
-              <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="daily-data-title">
-                <div className="mb-4 flex items-center gap-2 text-gray-800">
-                  <Activity className="h-5 w-5 text-indigo-600" />
+              <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-sm" aria-labelledby="daily-data-title">
+                <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                  <Activity className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   <h2 id="daily-data-title" className="font-semibold">近7日分析数据</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-[620px] w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200 text-left text-gray-500">
+                      <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500 dark:text-gray-400">
                         <th className="px-2 py-2">日期（UTC）</th>
                         <th className="px-2 py-2 text-right">PV</th>
                         <th className="px-2 py-2 text-right">UV</th>
@@ -602,7 +606,7 @@ export default function AdminPage() {
                     </thead>
                     <tbody>
                       {trendRows.map((item) => (
-                        <tr key={item.date} className="border-b border-gray-100 text-gray-700">
+                        <tr key={item.date} className="border-b border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300">
                           <td className="px-2 py-2 whitespace-nowrap">{item.date}</td>
                           <td className="px-2 py-2 text-right tabular-nums">{item.visits}</td>
                           <td className="px-2 py-2 text-right tabular-nums">{item.uniqueVisitors}</td>
@@ -614,21 +618,21 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-3 text-xs text-gray-500">PV 为页面访问次数；UV 按 IP 与 UA 估算；时间按 UTC 日期统计。</p>
+                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">PV 为页面访问次数；UV 按 IP 与 UA 估算；时间按 UTC 日期统计。</p>
               </section>
             </div>
 
-            <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5">
+            <div className="min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 shadow-sm sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-gray-800">
-                  <RefreshCw className="h-5 w-5 text-indigo-600" />
+                <div className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                  <RefreshCw className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   <span className="font-semibold">最近请求记录</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => fetchOverview(password)}
                   disabled={loading}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? '刷新中...' : '手动刷新'}
                 </button>
@@ -636,7 +640,7 @@ export default function AdminPage() {
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 text-left text-gray-500">
+                    <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500 dark:text-gray-400">
                       <th className="px-2 py-2">时间</th>
                       <th className="px-2 py-2">类型</th>
                       <th className="px-2 py-2">状态</th>
@@ -645,20 +649,20 @@ export default function AdminPage() {
                   </thead>
                   <tbody>
                     {(payload?.overview.recentEvents || []).map((event) => (
-                      <tr key={event.id} className="border-b border-gray-100 text-gray-700">
+                      <tr key={event.id} className="border-b border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300">
                         <td className="px-2 py-2 whitespace-nowrap">{formatDateTime(event.createdAt)}</td>
                         <td className="px-2 py-2">{event.type}</td>
                         <td className="px-2 py-2">
-                          <span className={event.status === 'success' ? 'text-emerald-600' : 'text-rose-600'}>
+                          <span className={event.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
                             {event.status}
                           </span>
                         </td>
                         <td className="px-2 py-2">
                           <details>
-                            <summary className="w-fit cursor-pointer select-none text-indigo-600 hover:text-indigo-800">
+                            <summary className="w-fit cursor-pointer select-none text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
                               查看详情
                             </summary>
-                            <div className="mt-2 max-w-xl whitespace-pre-wrap break-words rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+                            <div className="mt-2 max-w-xl whitespace-pre-wrap break-words rounded-md bg-gray-50 dark:bg-gray-800 p-3 text-xs text-gray-600 dark:text-gray-400">
                               {event.status === 'error'
                                 ? event.errorMessage || '无错误详情'
                                 : `图片输入：${event.hasImages ? '是' : '否'}\nPrompt 长度：${event.promptLength ?? '-'}\nMarkdown 长度：${event.markdownLength ?? '-'}`}

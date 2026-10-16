@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import ChunkErrorAutoReload from './chunk-error-auto-reload';
+import { THEME_BOOT_SCRIPT } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#030712' },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -32,6 +40,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Resolves light/dark before first paint: saved choice wins, otherwise
+            the OS preference is mirrored (and kept in sync afterwards). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
         <ChunkErrorAutoReload />
         {children}

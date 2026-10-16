@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import ThemeToggle from '@/components/theme-toggle';
+import { useResolvedTheme } from '@/lib/use-theme';
 import Markdown from 'markdown-to-jsx';
 import Link from 'next/link';
 
@@ -88,13 +90,13 @@ function AccountControls({ locale, email, onLogout }: { locale: 'zh' | 'en'; ema
 
   return email ? (
     <div className="flex items-center gap-2 text-xs sm:text-sm">
-      <span className="max-w-28 truncate text-gray-600 sm:max-w-48">{email}</span>
-      <button type="button" onClick={logout} className="rounded-md border border-gray-200 px-2 py-1.5 text-gray-600 hover:bg-gray-50">
+      <span className="max-w-28 truncate text-gray-600 dark:text-gray-400 sm:max-w-48">{email}</span>
+      <button type="button" onClick={logout} className="rounded-md border border-gray-200 dark:border-gray-700 px-2 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
         {locale === 'zh' ? '退出' : 'Log out'}
       </button>
     </div>
   ) : (
-    <Link href="/login" className="rounded-md border border-indigo-200 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 sm:px-3 sm:text-sm">
+    <Link href="/login" className="rounded-md border border-indigo-200 dark:border-indigo-800 px-2.5 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-800/50 sm:px-3 sm:text-sm">
       {locale === 'zh' ? '登录 / 注册' : 'Sign in'}
     </Link>
   );
@@ -144,6 +146,10 @@ function sanitizeMermaidCode(raw: string): string {
 }
 
 function MermaidDiagram({ code }: { code: string }) {
+  // Mermaid bakes colours into the SVG it emits, so it has to be re-rendered
+  // when the theme flips. The .docx export path deliberately stays light.
+  const theme = useResolvedTheme();
+
   const [locale] = useState<Locale>(() => resolveInitialLocale());
   const [svg, setSvg] = useState('');
   const [renderError, setRenderError] = useState('');
@@ -158,6 +164,7 @@ function MermaidDiagram({ code }: { code: string }) {
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'strict',
+          theme: theme === 'dark' ? 'dark' : 'default',
           flowchart: {
             htmlLabels: false,
             useMaxWidth: false,
@@ -178,7 +185,7 @@ function MermaidDiagram({ code }: { code: string }) {
     return () => {
       active = false;
     };
-  }, [chartCode, locale]);
+  }, [chartCode, locale, theme]);
 
   if (!chartCode) {
     return null;
@@ -188,9 +195,9 @@ function MermaidDiagram({ code }: { code: string }) {
     return null; // 静默跳过渲染失败的图示
   }
   if (!svg) {
-    return <div className="my-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">{locale === 'zh' ? '图示渲染中...' : 'Rendering diagram...'}</div>;
+    return <div className="my-3 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{locale === 'zh' ? '图示渲染中...' : 'Rendering diagram...'}</div>;
   }
-  return <div className="mermaid-diagram my-3 overflow-x-auto rounded-md border border-gray-200 bg-white p-2" dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div className="mermaid-diagram my-3 overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 function getMammoth() {
@@ -1283,7 +1290,7 @@ export default function Home() {
           <ImgElement
             alt={alt}
             src={resolvedSrc}
-            className={cn("rounded-lg shadow-sm border border-gray-200 object-contain mx-auto", imageClassName)}
+            className={cn("rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 object-contain mx-auto", imageClassName)}
             {...props}
           />
         );
@@ -1300,12 +1307,12 @@ export default function Home() {
             : String(codeNode.props.children ?? '');
           if (className.includes('language-mermaid')) {
             return isStreamingPreview
-              ? <div className="my-3 min-h-16 rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-xs text-gray-500">{locale === 'zh' ? '图示生成中…' : 'Generating diagram…'}</div>
+              ? <div className="my-3 min-h-16 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{locale === 'zh' ? '图示生成中…' : 'Generating diagram…'}</div>
               : <MermaidDiagram code={codeContent} />;
           }
           if (/^mermaid\s*\n/i.test(codeContent)) {
             return isStreamingPreview
-              ? <div className="my-3 min-h-16 rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-xs text-gray-500">{locale === 'zh' ? '图示生成中…' : 'Generating diagram…'}</div>
+              ? <div className="my-3 min-h-16 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{locale === 'zh' ? '图示生成中…' : 'Generating diagram…'}</div>
               : <MermaidDiagram code={codeContent.replace(/^mermaid\s*\n/i, '')} />;
           }
         }
@@ -1316,23 +1323,24 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen bg-gray-50/50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gray-50/50 dark:bg-gray-950 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 shrink-0 z-10">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shrink-0 z-10">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-indigo-600">
+          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
             <Wand2 className="w-6 h-6" />
-            <h1 className="text-xl font-bold text-gray-900">{text('appTitle')}</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{text('appTitle')}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <AccountControls locale={locale} email={accountEmail} onLogout={() => setAccountEmail('')} />
-            <div className="hidden md:flex rounded-lg bg-gray-100 p-1">
+            <ThemeToggle locale={locale} />
+            <div className="hidden md:flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
               <button
                 type="button"
                 onClick={() => setLocale('en')}
                 className={cn(
                   'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                  locale === 'en' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  locale === 'en' ? 'bg-white dark:bg-gray-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                 )}
               >
                 EN
@@ -1342,7 +1350,7 @@ export default function Home() {
                 onClick={() => setLocale('zh')}
                 className={cn(
                   'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                  locale === 'zh' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  locale === 'zh' ? 'bg-white dark:bg-gray-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                 )}
               >
                 中文
@@ -1356,36 +1364,36 @@ export default function Home() {
       <main className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 py-6 h-full flex flex-col gap-4">
           <div className="shrink-0">
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5">
               <details className="group">
                 <summary className="list-none cursor-pointer select-none">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="text-base md:text-lg font-semibold text-gray-900">{text('diffTitle')}</div>
-                      <div className="mt-1 text-sm text-gray-600">{text('diffSubtitle')}</div>
+                      <div className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100">{text('diffTitle')}</div>
+                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{text('diffSubtitle')}</div>
                     </div>
-                    <div className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 transition-colors">
+                    <div className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                       <span className="group-open:hidden">{text('diffToggleShow')}</span>
                       <span className="hidden group-open:inline">{text('diffToggleHide')}</span>
-                      <ChevronDown className="w-4 h-4 text-gray-500 group-open:hidden" />
-                      <ChevronUp className="w-4 h-4 text-gray-500 hidden group-open:block" />
+                      <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 group-open:hidden" />
+                      <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 hidden group-open:block" />
                     </div>
                   </div>
                 </summary>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-sm font-semibold text-gray-900">{text('diffLeftTitle')}</div>
-                    <div className="mt-1 text-xs text-gray-600">{text('diffLeftP1')}</div>
-                    <ul className="mt-3 space-y-2 text-sm text-gray-700">
-                      <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0" />{text('diffLeftB1')}</li>
-                      <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0" />{text('diffLeftB2')}</li>
-                      <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0" />{text('diffLeftB3')}</li>
+                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{text('diffLeftTitle')}</div>
+                    <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">{text('diffLeftP1')}</div>
+                    <ul className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                      <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-gray-400 dark:bg-gray-600 shrink-0" />{text('diffLeftB1')}</li>
+                      <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-gray-400 dark:bg-gray-600 shrink-0" />{text('diffLeftB2')}</li>
+                      <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-gray-400 dark:bg-gray-600 shrink-0" />{text('diffLeftB3')}</li>
                     </ul>
                   </div>
-                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
-                    <div className="text-sm font-semibold text-indigo-900">{text('diffRightTitle')}</div>
+                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-900/30 p-4">
+                    <div className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">{text('diffRightTitle')}</div>
                     <div className="mt-1 text-xs text-indigo-800/80">{text('diffRightP1')}</div>
-                    <ul className="mt-3 space-y-2 text-sm text-indigo-900">
+                    <ul className="mt-3 space-y-2 text-sm text-indigo-900 dark:text-indigo-200">
                       <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />{text('diffRightB1')}</li>
                       <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />{text('diffRightB2')}</li>
                       <li className="flex gap-2"><span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />{text('diffRightB3')}</li>
@@ -1400,16 +1408,16 @@ export default function Home() {
           {/* Left Column: Advanced Settings */}
           <div className="w-full lg:w-[25%] lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-2 hide-scrollbar">
             <div
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 outline-none focus-within:ring-2 focus-within:ring-indigo-100 lg:min-h-full"
+              className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 outline-none focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900 lg:min-h-full"
               tabIndex={0}
             >
-              <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
-                <SlidersHorizontal className="w-5 h-5 text-indigo-500" />
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
+                <SlidersHorizontal className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
                 {text('advancedTitle')}
               </h2>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {text('wordCountLabel')}
                   </label>
                   <input
@@ -1417,91 +1425,91 @@ export default function Home() {
                     value={wordCount}
                     onChange={(e) => setWordCount(e.target.value)}
                     placeholder={locale === 'zh' ? '例如: 1000' : 'e.g. 1000'}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {text('writingStyleLabel')}
                   </label>
                   <select
                     value={writingStyle}
                     onChange={(e) => setWritingStyle(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                   >
                     {writingStyleOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {text('eduLevelLabel')}
                   </label>
                   <select
                     value={eduLevel}
                     onChange={(e) => setEduLevel(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                   >
                     {eduLevelOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 {eduLevel && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {text('perfLevelLabel')}
                     </label>
                     <select
                       value={perfLevel}
                       onChange={(e) => setPerfLevel(e.target.value)}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                     >
                       {perfLevelOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
                   </div>
                 )}
-                <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+                <div className="flex flex-col gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-800">{text('addTyposLabel')}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{text('addTyposLabel')}</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" checked={addTypos} onChange={(e) => setAddTypos(e.target.checked)} />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </label>
                   </div>
-                  <span className="text-xs text-gray-500">{text('addTyposHint')}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{text('addTyposHint')}</span>
                 </div>
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-800">{text('humanTraceLabel')}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{text('humanTraceLabel')}</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" checked={humanTrace} onChange={(e) => setHumanTrace(e.target.checked)} />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </label>
                   </div>
-                  <span className="text-xs text-gray-500">{text('humanTraceHint')}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{text('humanTraceHint')}</span>
                 </div>
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-800">{text('evidenceLabel')}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{text('evidenceLabel')}</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" checked={enableEvidenceSupport} onChange={(e) => setEnableEvidenceSupport(e.target.checked)} />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </label>
                   </div>
-                  <span className="text-xs text-gray-500">{text('evidenceHint')}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{text('evidenceHint')}</span>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {text('diagramLabel')}
                   </label>
                   <select
                     value={diagramMode}
                     onChange={(e) => setDiagramMode(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                   >
                     {diagramModeOptions.map((mode) => (
                       <option key={mode.value} value={mode.value}>{mode.label}</option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">{text('diagramHint')}</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{text('diagramHint')}</p>
                 </div>
               </div>
             </div>
@@ -1511,22 +1519,22 @@ export default function Home() {
           {/* Middle Column: Inputs */}
           <div className="w-full lg:w-[45%] lg:h-full lg:overflow-y-auto lg:pr-2 pb-6 space-y-6 custom-scrollbar">
             {/* Settings Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-2 mb-4 text-gray-800">
-              <Settings className="w-5 h-5 text-gray-500" />
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center gap-2 mb-4 text-gray-800 dark:text-gray-200">
+              <Settings className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               <h2 className="text-lg font-semibold">{text('generationSettings')}</h2>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {text('promptLabel')} <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {text('promptLabel')} <span className="text-red-500 dark:text-red-400">*</span>
                 </label>
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onPasteCapture={handleImagePaste}
                   placeholder={text('promptPlaceholder')}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none"
                   rows={4}
                 />
               </div>
@@ -1534,34 +1542,34 @@ export default function Home() {
           </div>
 
           {/* Content Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div
-              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-between"
+              className="p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-between"
               onClick={() => setIsContentOpen(!isContentOpen)}
             >
-              <div className="flex items-center gap-2 text-gray-800">
-                <FileText className="w-5 h-5 text-gray-500" />
+              <div className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                <FileText className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 <h2 className="text-lg font-semibold">{text('contentCardTitle')}</h2>
                 {content && (
-                  <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                  <span className="ml-2 text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-medium">
                     {text('contentFilled')}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 hidden sm:inline-block">
+                <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline-block">
                   {text('contentHint')}
                 </span>
-                <div className="p-1 rounded-full bg-gray-100 text-gray-500">
+                <div className="p-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
                   {isContentOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                 </div>
               </div>
             </div>
 
             {isContentOpen && (
-              <div className="px-6 pb-6 border-t border-gray-100 pt-4 bg-gray-50/30">
+              <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-800 pt-4 bg-gray-50/30">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm font-medium text-gray-700">{locale === 'zh' ? '文本内容' : 'Text content'}</div>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{locale === 'zh' ? '文本内容' : 'Text content'}</div>
                   <div className="flex items-center gap-3">
                     <input
                       type="file"
@@ -1576,7 +1584,7 @@ export default function Home() {
                         fileInputRef.current?.click();
                       }}
                       disabled={isUploading}
-                      className="text-xs flex items-center gap-1 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                      className="text-xs flex items-center gap-1 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-800/60 px-3 py-1.5 rounded-md transition-colors"
                     >
                       {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                       {locale === 'zh' ? '上传 Word 提取文字' : 'Upload .docx'}
@@ -1588,7 +1596,7 @@ export default function Home() {
                   onChange={(e) => setContent(e.target.value)}
                   onPasteCapture={handleImagePaste}
                   placeholder={locale === 'zh' ? '在此粘贴需要美化或润色的文本内容...' : 'Paste the text you want to format or improve...'}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none font-mono text-sm bg-white"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none font-mono text-sm bg-white dark:bg-gray-900"
                   rows={8}
                 />
               </div>
@@ -1596,21 +1604,21 @@ export default function Home() {
           </div>
           {/* Image Upload Section */}
             <div
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 outline-none focus-within:ring-2 focus-within:ring-indigo-100"
+              className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 outline-none focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900"
               tabIndex={0}
               onPasteCapture={handleImagePaste}
             >
               <div className="flex flex-col mb-4 gap-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-gray-800">
-                    <ImagePlus className="w-5 h-5 text-gray-500" />
+                  <div className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                    <ImagePlus className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                     <h2 className="text-lg font-semibold">{locale === 'zh' ? '上传图片 (可选)' : 'Images (Optional)'}</h2>
                   </div>
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                     {locale === 'zh' ? '上传图片并要求AI插入到文档中' : 'Upload images and let the model reference them'}
                   </span>
                 </div>
-                <div className="text-xs text-indigo-600 bg-indigo-50 p-2 rounded-md flex items-start gap-1">
+                <div className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 p-2 rounded-md flex items-start gap-1">
                   <Wand2 className="w-4 h-4 shrink-0" />
                   <span>{locale === 'zh' ? '上传图片后，AI 将会自动分析图片内容并将其插入到文章的相应位置。你也可以点击此区域后直接粘贴图片；若上传 GIF，将自动提取首帧。' : 'The model can analyze uploaded images and place them in the document. Click this area and paste an image directly; GIFs are handled as the first frame.'}</span>
                 </div>
@@ -1618,7 +1626,7 @@ export default function Home() {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {uploadedImages.map((img) => (
-                <div key={img.id} className="relative group rounded-lg border border-gray-200 overflow-hidden aspect-square bg-gray-50">
+                <div key={img.id} className="relative group rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden aspect-square bg-gray-50 dark:bg-gray-800">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={img.base64}
@@ -1627,7 +1635,7 @@ export default function Home() {
                   />
                   <button
                     onClick={() => removeImage(img.id)}
-                    className="absolute top-2 right-2 p-1 bg-white/80 hover:bg-red-100 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 p-1 bg-white/80 dark:bg-gray-800/80 hover:bg-red-100 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1639,7 +1647,7 @@ export default function Home() {
 
               <button
                 onClick={() => imageInputRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-indigo-500 hover:bg-indigo-50 transition-colors aspect-square text-gray-500 hover:text-indigo-600"
+                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-800/50 transition-colors aspect-square text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
               >
                 <ImagePlus className="w-6 h-6" />
                 <span className="text-xs font-medium">{locale === 'zh' ? '添加图片' : 'Add images'}</span>
@@ -1658,8 +1666,8 @@ export default function Home() {
 
           {/* Right Column: Actions & Status */}
           <div className="w-full lg:w-[40%] lg:h-full lg:overflow-y-auto lg:pr-2 pb-6 flex flex-col hide-scrollbar">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-max lg:min-h-full">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4 shrink-0">{locale === 'zh' ? '操作面板' : 'Actions'}</h2>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col min-h-max lg:min-h-full">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 shrink-0">{locale === 'zh' ? '操作面板' : 'Actions'}</h2>
 
               <button
                 onClick={handleGenerate}
@@ -1686,21 +1694,21 @@ export default function Home() {
                 )}
               </button>
 
-              <div className="text-xs text-gray-500 text-center mt-3 shrink-0">
+              <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3 shrink-0">
                 {locale === 'zh' ? '点击开始排版并生成即表示您同意本站的' : 'By using this site, you agree to the'}
-                <button onClick={() => setIsAgreementModalOpen(true)} className="text-indigo-600 hover:underline mx-1">{text('agreementBrackets')}</button>
+                <button onClick={() => setIsAgreementModalOpen(true)} className="text-indigo-600 dark:text-indigo-400 hover:underline mx-1">{text('agreementBrackets')}</button>
                 {locale === 'zh' ? '与' : 'and'}
-                <button onClick={() => setIsPrivacyModalOpen(true)} className="text-indigo-600 hover:underline ml-1">{text('privacyBrackets')}</button>
+                <button onClick={() => setIsPrivacyModalOpen(true)} className="text-indigo-600 dark:text-indigo-400 hover:underline ml-1">{text('privacyBrackets')}</button>
               </div>
 
               {/* Generated Content View */}
               {(displayedMarkdown || isFetching || isTyping) && (
-                <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex flex-col flex-1 min-h-[300px] transition-all">
-                  <div className="bg-gray-100 border-b border-gray-200 px-3 py-2 flex items-center justify-between shrink-0">
-                    <span className="text-xs font-medium text-gray-600">{locale === 'zh' ? '生成预览' : 'Preview'}</span>
+                <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800 flex flex-col flex-1 min-h-[300px] transition-all">
+                  <div className="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-2 flex items-center justify-between shrink-0">
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{locale === 'zh' ? '生成预览' : 'Preview'}</span>
                     <button
                       onClick={() => setIsModalOpen(true)}
-                      className="text-gray-500 hover:text-indigo-600 p-1 rounded hover:bg-gray-200 transition-colors"
+                      className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       title={locale === 'zh' ? '全屏查看' : 'Fullscreen'}
                     >
                       <Maximize2 className="w-4 h-4" />
@@ -1709,7 +1717,7 @@ export default function Home() {
                   <div
                     ref={resultRef}
                     onScroll={handleScroll}
-                    className="p-4 overflow-y-auto flex-1 text-sm prose prose-sm prose-indigo max-w-none custom-scrollbar bg-white"
+                    className="p-4 overflow-y-auto flex-1 text-sm prose prose-sm prose-indigo dark:prose-invert max-w-none custom-scrollbar bg-white dark:bg-gray-900"
                   >
                     {displayedMarkdown ? (
                       <Markdown
@@ -1720,19 +1728,19 @@ export default function Home() {
                         {cleanMarkdown}
                       </Markdown>
                     ) : (
-                      <div className="text-gray-400 flex items-center justify-center h-full w-full gap-2 animate-pulse">
+                      <div className="text-gray-400 dark:text-gray-500 flex items-center justify-center h-full w-full gap-2 animate-pulse">
                         <Loader2 className="w-4 h-4 animate-spin" /> {statusMsg || (locale === 'zh' ? '正在思考中...' : 'Thinking...')}
                       </div>
                     )}
                   </div>
-                  <div className="bg-white border-t border-gray-200 p-3 shrink-0">
+                  <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-3 shrink-0">
                   <button
                     onClick={handleDownload}
                     disabled={isFetching || isTyping || isDownloading || !displayedMarkdown}
                     className={cn(
                       "w-full flex items-center justify-center gap-2 py-2 px-4 rounded-md font-medium transition-all text-sm",
                       (isFetching || isTyping || !displayedMarkdown || isDownloading)
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                         : "bg-green-600 text-white hover:bg-green-700 shadow-sm"
                     )}
                   >
@@ -1749,16 +1757,16 @@ export default function Home() {
 
             {/* Refinement Panel */}
             {(!isFetching && !isTyping && displayedMarkdown) && (
-              <div className="mt-4 bg-indigo-50/50 rounded-xl border border-indigo-100 p-5 shrink-0 transition-all">
-                <h3 className="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+              <div className="mt-4 bg-indigo-50/50 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-900 p-5 shrink-0 transition-all">
+                <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-200 mb-3 flex items-center gap-2">
                   <Wand2 className="w-4 h-4" />
                   {locale === 'zh' ? '对结果不满意？继续润色优化' : 'Refine the draft'}
                 </h3>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我自动润色一下这篇文章，使其更加通顺流畅、用词更专业准确。' : 'Polish the draft for clarity and professionalism.')} className="text-xs bg-white border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 hover:border-indigo-300 transition-colors">{locale === 'zh' ? '自动润色' : 'Polish'}</button>
-                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我扩写当前内容，增加更多的细节和生动的描述，使其更加丰富。' : 'Expand the draft with more detail and examples while keeping it coherent.')} className="text-xs bg-white border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 hover:border-indigo-300 transition-colors">{locale === 'zh' ? '丰富扩写' : 'Expand'}</button>
-                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我精简当前内容，去除冗余词句，保留核心信息即可。' : 'Shorten the draft by removing redundancy while keeping the key information.')} className="text-xs bg-white border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 hover:border-indigo-300 transition-colors">{locale === 'zh' ? '精简缩写' : 'Shorten'}</button>
-                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我调整这篇文章的语气，使其显得更加正式和严谨。' : 'Make the tone more formal and rigorous.')} className="text-xs bg-white border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 hover:border-indigo-300 transition-colors">{locale === 'zh' ? '更正式' : 'More formal'}</button>
+                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我自动润色一下这篇文章，使其更加通顺流畅、用词更专业准确。' : 'Polish the draft for clarity and professionalism.')} className="text-xs bg-white dark:bg-gray-900 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-800/60 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">{locale === 'zh' ? '自动润色' : 'Polish'}</button>
+                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我扩写当前内容，增加更多的细节和生动的描述，使其更加丰富。' : 'Expand the draft with more detail and examples while keeping it coherent.')} className="text-xs bg-white dark:bg-gray-900 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-800/60 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">{locale === 'zh' ? '丰富扩写' : 'Expand'}</button>
+                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我精简当前内容，去除冗余词句，保留核心信息即可。' : 'Shorten the draft by removing redundancy while keeping the key information.')} className="text-xs bg-white dark:bg-gray-900 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-800/60 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">{locale === 'zh' ? '精简缩写' : 'Shorten'}</button>
+                  <button onClick={() => handleRefine(locale === 'zh' ? '请帮我调整这篇文章的语气，使其显得更加正式和严谨。' : 'Make the tone more formal and rigorous.')} className="text-xs bg-white dark:bg-gray-900 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-800/60 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">{locale === 'zh' ? '更正式' : 'More formal'}</button>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -1767,12 +1775,12 @@ export default function Home() {
                     onChange={(e) => setRefinePrompt(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleRefine()}
                     placeholder={text('refinePlaceholder')}
-                    className="flex-1 rounded-lg border border-indigo-200 px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                    className="flex-1 rounded-lg border border-indigo-200 dark:border-indigo-800 px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                   />
                   <button
                     onClick={() => handleRefine()}
                     disabled={!refinePrompt.trim()}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                   >
                     {text('refineButton')}
                   </button>
@@ -1783,25 +1791,25 @@ export default function Home() {
             {/* Status Messages */}
               <div className="mt-6 space-y-4 shrink-0">
                 {error && (
-                  <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-start gap-3 text-red-700">
+                  <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-900 rounded-lg flex items-start gap-3 text-red-700 dark:text-red-400">
                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                     <div className="text-sm">
                       <p>{error}</p>
-                      {requiresLogin && <Link href="/login?returnTo=%2F" className="mt-2 inline-block font-medium text-indigo-700 underline underline-offset-2">{locale === 'zh' ? '登录或注册' : 'Sign in or create an account'}</Link>}
+                      {requiresLogin && <Link href="/login?returnTo=%2F" className="mt-2 inline-block font-medium text-indigo-700 dark:text-indigo-300 underline underline-offset-2">{locale === 'zh' ? '登录或注册' : 'Sign in or create an account'}</Link>}
                     </div>
                   </div>
                 )}
 
                 {success && (
-                  <div className="p-4 bg-green-50 border border-green-100 rounded-lg flex items-start gap-3 text-green-700">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-100 dark:border-green-900 rounded-lg flex items-start gap-3 text-green-700 dark:text-green-400">
                     <Download className="w-5 h-5 shrink-0 mt-0.5" />
                     <p className="text-sm">{text('generateSuccess')}</p>
                   </div>
                 )}
 
-                <div className="pt-6 border-t border-gray-100 pb-4">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">{locale === 'zh' ? '使用说明与免责声明' : 'Usage & Disclaimer'}</h3>
-                  <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside pl-1 mb-4">
+                <div className="pt-6 border-t border-gray-100 dark:border-gray-800 pb-4">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">{locale === 'zh' ? '使用说明与免责声明' : 'Usage & Disclaimer'}</h3>
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-disc list-inside pl-1 mb-4">
                     <li>{locale === 'zh' ? '生成和下载需先登录账号。' : 'Sign in is required to generate and download documents.'}</li>
                     <li><strong>{locale === 'zh' ? '直接生成：' : 'Generate:'}</strong> {locale === 'zh' ? '输入要求并点击生成，即可获得结构清晰、可下载的 Word 文档。' : 'Enter instructions and click Generate to get a well-structured draft and a downloadable .docx.'}</li>
                     <li><strong>{locale === 'zh' ? '排版美化：' : 'Beautify:'}</strong> {locale === 'zh' ? '粘贴已有内容或上传 .docx，并在要求中说明目标风格与结构。' : 'Paste existing content or upload a .docx, then describe the desired style and structure.'}</li>
@@ -1812,14 +1820,14 @@ export default function Home() {
               </div>
 
               {/* Author & Date Settings Card */}
-              <div className="mt-6 border-t border-gray-100 pt-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-indigo-500" />
+              <div className="mt-6 border-t border-gray-100 dark:border-gray-800 pt-6">
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
                   {text('signatureTitle')}
                 </h2>
                 <div className="space-y-5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-800">{text('signatureToggle')}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{text('signatureToggle')}</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" checked={enableSignatureDate} onChange={(e) => setEnableSignatureDate(e.target.checked)} />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
@@ -1828,7 +1836,7 @@ export default function Home() {
                   {enableSignatureDate ? (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {text('authorLabel')}
                         </label>
                         <input
@@ -1836,11 +1844,11 @@ export default function Home() {
                           value={authorName}
                           onChange={(e) => setAuthorName(e.target.value)}
                           placeholder={text('authorPlaceholder')}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                          className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {text('dateLabel')}
                         </label>
                         <input
@@ -1848,12 +1856,12 @@ export default function Home() {
                           value={documentDate}
                           onChange={(e) => setDocumentDate(e.target.value)}
                           placeholder={text('datePlaceholder')}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                          className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-900"
                         />
                       </div>
                     </>
                   ) : (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       {text('signatureOffHint')}
                     </div>
                   )}
@@ -1866,13 +1874,13 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 shrink-0 py-4">
-        <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
+      <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shrink-0 py-4">
+        <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500 dark:text-gray-400 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
           <p>{text('footerBrand')}</p>
           <p className="hidden sm:block">|</p>
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsAgreementModalOpen(true)} className="hover:text-indigo-600 transition-colors">{text('agreement')}</button>
-            <button onClick={() => setIsPrivacyModalOpen(true)} className="hover:text-indigo-600 transition-colors">{text('privacy')}</button>
+            <button onClick={() => setIsAgreementModalOpen(true)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{text('agreement')}</button>
+            <button onClick={() => setIsPrivacyModalOpen(true)} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{text('privacy')}</button>
           </div>
         </div>
       </footer>
@@ -1880,17 +1888,17 @@ export default function Home() {
       {/* Privacy Policy Modal */}
       {isPrivacyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800 text-lg">{text('privacyTitle')}</h3>
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-lg">{text('privacyTitle')}</h3>
               <button
                 onClick={() => setIsPrivacyModalOpen(false)}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 transition-colors"
+                className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1 prose prose-sm max-w-none text-gray-600 custom-scrollbar">
+            <div className="p-6 overflow-y-auto flex-1 prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-400 custom-scrollbar">
               {locale === 'zh' ? (
                 <>
                   <h4>1. 数据收集与流转</h4>
@@ -1922,17 +1930,17 @@ export default function Home() {
       {/* User Agreement Modal */}
       {isAgreementModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800 text-lg">{text('agreementTitle')}</h3>
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-lg">{text('agreementTitle')}</h3>
               <button
                 onClick={() => setIsAgreementModalOpen(false)}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 transition-colors"
+                className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1 prose prose-sm max-w-none text-gray-600 custom-scrollbar">
+            <div className="p-6 overflow-y-auto flex-1 prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-400 custom-scrollbar">
               {locale === 'zh' ? (
                 <>
                   <h4>1. 服务说明</h4>
@@ -1964,12 +1972,12 @@ export default function Home() {
       {/* Mobile Modal for Markdown Preview */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800">{locale === 'zh' ? '文档预览' : 'Document preview'}</h3>
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-200">{locale === 'zh' ? '文档预览' : 'Document preview'}</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 transition-colors"
+                className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400 transition-colors"
               >
                 <Minimize2 className="w-4 h-4" />
               </button>
@@ -1991,13 +1999,13 @@ export default function Home() {
                 </div>
               ) : null}
             </div>
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row justify-end gap-3">
+            <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex flex-col sm:flex-row justify-end gap-3">
               {(!isFetching && !isTyping && displayedMarkdown) && (
                 <button
                   onClick={handleCopy}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 py-2 px-6 rounded-lg font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm transition-all"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 py-2 px-6 rounded-lg font-medium bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm transition-all"
                 >
-                  {isCopied ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5" />}
+                  {isCopied ? <Check className="w-5 h-5 text-green-600 dark:text-green-400" /> : <Copy className="w-5 h-5" />}
                   {isCopied ? (locale === 'zh' ? '已复制' : 'Copied') : (locale === 'zh' ? '复制内容' : 'Copy')}
                 </button>
               )}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, LoaderCircle, UserRound } from 'lucide-react';
+import ThemeToggle from '@/components/theme-toggle';
 
 function meetsPasswordPolicy(value: string) {
   const characterTypes = [/[a-z]/.test(value), /[A-Z]/.test(value), /[0-9]/.test(value), /[^A-Za-z0-9\s]/.test(value)];
@@ -123,67 +124,70 @@ export default function AccountForm({ initialMode = 'login' }: { initialMode?: '
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-        <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600">
-          <ArrowLeft className="h-4 w-4" /> 返回文档助手
-        </Link>
+    <main className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 py-10">
+      <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 shadow-sm sm:p-8">
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">
+            <ArrowLeft className="h-4 w-4" /> 返回文档助手
+          </Link>
+          <ThemeToggle locale="zh" />
+        </div>
         <div className="mb-6 flex items-center gap-3">
-          <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600"><UserRound className="h-6 w-6" /></div>
+          <div className="rounded-xl bg-indigo-50 dark:bg-indigo-900/30 p-3 text-indigo-600 dark:text-indigo-400"><UserRound className="h-6 w-6" /></div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{{ login: '登录账号', register: '创建账号', verify: '邮箱验证', forgot: '找回密码', reset: '设置新密码' }[mode]}</h1>
-            <p className="mt-1 text-sm text-gray-500">登录后可统计个人生成和下载使用情况</p>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{{ login: '登录账号', register: '创建账号', verify: '邮箱验证', forgot: '找回密码', reset: '设置新密码' }[mode]}</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">登录后可统计个人生成和下载使用情况</p>
           </div>
         </div>
         <form className="space-y-4" onSubmit={submit}>
-          {mode !== 'reset' && <label className="block text-sm font-medium text-gray-700">
+          {mode !== 'reset' && <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             邮箱
             <input required type="email" autoComplete="email" maxLength={254} value={email} disabled={mode === 'register' && codeSent} onChange={(event) => setEmail(event.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-100 disabled:text-gray-500" placeholder="name@example.com" />
+              className="mt-1.5 w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400" placeholder="name@example.com" />
           </label>}
-          {mode === 'register' && <div className="block text-sm font-medium text-gray-700">
+          {mode === 'register' && <div className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             邮箱验证码
             <div className="mt-1.5 flex gap-2">
               <input required={codeSent} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" placeholder="输入 6 位验证码" />
-              <button type="button" onClick={sendVerificationCode} disabled={busy || resendCooldown > 0} className="w-32 shrink-0 cursor-pointer rounded-lg border border-indigo-200 bg-indigo-50 px-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60">
+                className="min-w-0 flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900" placeholder="输入 6 位验证码" />
+              <button type="button" onClick={sendVerificationCode} disabled={busy || resendCooldown > 0} className="w-32 shrink-0 cursor-pointer rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 px-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-900/50 disabled:cursor-not-allowed disabled:opacity-60">
                 {busy ? '发送中…' : resendCooldown > 0 ? `${resendCooldown} 秒后重发` : codeSent ? '重新发送' : '发送验证码'}
               </button>
             </div>
-            <span className="mt-1 block text-xs font-normal text-gray-500">验证码 10 分钟内有效。请检查收件箱和垃圾邮件。</span>
+            <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">验证码 10 分钟内有效。请检查收件箱和垃圾邮件。</span>
           </div>}
-          {mode === 'verify' && <label className="block text-sm font-medium text-gray-700">
+          {mode === 'verify' && <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             邮箱验证码
             <input required type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-3 text-center font-mono text-2xl tracking-[0.45em] text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" placeholder="输入 6 位验证码" />
-            <span className="mt-1 block text-xs font-normal text-gray-500">验证码 10 分钟内有效。请检查收件箱和垃圾邮件。</span>
+              className="mt-1.5 w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-3 text-center font-mono text-2xl tracking-[0.45em] text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900" placeholder="输入 6 位验证码" />
+            <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">验证码 10 分钟内有效。请检查收件箱和垃圾邮件。</span>
           </label>}
-          {mode !== 'forgot' && mode !== 'verify' && <label className="block text-sm font-medium text-gray-700">
+          {mode !== 'forgot' && mode !== 'verify' && <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             {mode === 'reset' ? '新密码' : '密码'}
             <input required type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' || mode === 'reset' ? 8 : 1} maxLength={128} value={password} disabled={mode === 'register' && codeSent} onChange={(event) => setPassword(event.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-100 disabled:text-gray-500" placeholder={mode === 'register' || mode === 'reset' ? '至少 8 个字符' : '请输入密码'} />
+              className="mt-1.5 w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2.5 text-gray-900 dark:text-gray-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400" placeholder={mode === 'register' || mode === 'reset' ? '至少 8 个字符' : '请输入密码'} />
             {(mode === 'register' || mode === 'reset') && <>
-              <span className="mt-1 block text-xs font-normal leading-5 text-gray-500">至少 8 个字符，并包含以下 4 种类型中的至少 3 种：大写字母、小写字母、数字、特殊字符。</span>
+              <span className="mt-1 block text-xs font-normal leading-5 text-gray-500 dark:text-gray-400">至少 8 个字符，并包含以下 4 种类型中的至少 3 种：大写字母、小写字母、数字、特殊字符。</span>
               {(() => {
                 const types = [/[a-z]/.test(password), /[A-Z]/.test(password), /[0-9]/.test(password), /[^A-Za-z0-9\s]/.test(password)].filter(Boolean).length;
                 const length = Array.from(password).length;
                 const score = password.length === 0 ? 0 : length < 8 || types <= 1 ? 1 : types === 2 ? 2 : types === 3 ? 3 : length >= 12 ? 4 : 3;
                 const levels = ['未输入', '较弱', '一般', '良好', '很强'];
-                const colors = ['bg-gray-200', 'bg-rose-500', 'bg-amber-500', 'bg-emerald-500', 'bg-indigo-600'];
+                const colors = ['bg-gray-200 dark:bg-gray-700', 'bg-rose-500', 'bg-amber-500', 'bg-emerald-500', 'bg-indigo-600'];
                 return <div className="mt-3" aria-live="polite">
                   <div className="mb-1.5 flex items-center justify-between text-xs font-normal">
-                    <span className="text-gray-500">密码强度</span>
-                    <span className={score < 2 ? 'font-medium text-rose-600' : score < 3 ? 'font-medium text-amber-600' : 'font-medium text-emerald-700'}>{levels[score]}</span>
+                    <span className="text-gray-500 dark:text-gray-400">密码强度</span>
+                    <span className={score < 2 ? 'font-medium text-rose-600 dark:text-rose-400' : score < 3 ? 'font-medium text-amber-600 dark:text-amber-400' : 'font-medium text-emerald-700 dark:text-emerald-400'}>{levels[score]}</span>
                   </div>
                   <div className="flex gap-1" aria-label={`密码强度：${levels[score]}`}>
-                    {[1, 2, 3, 4].map((segment) => <span key={segment} className={`h-1.5 flex-1 rounded-full ${segment <= score ? colors[score] : 'bg-gray-200'}`} />)}
+                    {[1, 2, 3, 4].map((segment) => <span key={segment} className={`h-1.5 flex-1 rounded-full ${segment <= score ? colors[score] : 'bg-gray-200 dark:bg-gray-700'}`} />)}
                   </div>
                 </div>;
               })()}
             </>}
           </label>}
-          {notice && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p>}
-          {error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+          {notice && <p role="status" className="rounded-lg bg-emerald-50 dark:bg-emerald-900/30 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">{notice}</p>}
+          {error && <p role="alert" className="rounded-lg bg-rose-50 dark:bg-rose-900/30 px-3 py-2 text-sm text-rose-700 dark:text-rose-400">{error}</p>}
           <button type="submit" disabled={busy} className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
             {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{{ login: '登录', register: '创建账号', verify: '验证邮箱并登录', forgot: '发送重置邮件', reset: '保存新密码' }[mode]}
           </button>
@@ -197,16 +201,16 @@ export default function AccountForm({ initialMode = 'login' }: { initialMode?: '
             setMode('verify'); setVerificationCode(''); setNotice(result.message || '验证码已发送，请查收邮件。'); setCanResend(false);
           } catch (resendError) { setError(resendError instanceof Error ? resendError.message : '暂时无法重新发送验证码。'); }
           finally { setBusy(false); }
-        }} className="mt-3 w-full cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed">重新发送验证码</button>}
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm text-gray-600">
-          {mode === 'login' && <button type="button" onClick={() => { setMode('forgot'); setError(''); setNotice(''); }} className="cursor-pointer text-gray-500 underline decoration-gray-300 underline-offset-4 hover:text-gray-800">忘记密码</button>}
+        }} className="mt-3 w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed">重新发送验证码</button>}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+          {mode === 'login' && <button type="button" onClick={() => { setMode('forgot'); setError(''); setNotice(''); }} className="cursor-pointer text-gray-500 dark:text-gray-400 underline decoration-gray-300 underline-offset-4 hover:text-gray-800 dark:hover:text-gray-200">忘记密码</button>}
           {mode !== 'reset' && mode !== 'verify' && <button type="button" onClick={() => {
             const nextMode = mode === 'register' ? 'login' : mode === 'login' ? 'register' : 'login';
             const returnTo = new URLSearchParams(window.location.search).get('returnTo');
             const destination = nextMode === 'register' ? '/register' : '/login';
             router.push(returnTo ? `${destination}?returnTo=${encodeURIComponent(returnTo)}` : destination);
             setMode(nextMode); setError(''); setNotice(''); setCanResend(false); setVerificationCode(''); setCodeSent(false); setResendCooldown(0);
-          }} className="cursor-pointer rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 font-medium text-indigo-700 hover:bg-indigo-100">
+          }} className="cursor-pointer rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-2 font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50">
             {mode === 'register' ? '已有账号？返回登录' : mode === 'login' ? '还没有账号？立即注册' : '返回登录'}
           </button>}
         </div>
