@@ -4,7 +4,8 @@ const { join, basename, extname, isAbsolute, normalize } = require('node:path');
 
 const APP_NAME = 'word助手';
 const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
-const APP_URL = String(config.appUrl || '').trim() || 'https://word.violet27chen.com/';
+// 优先取环境变量 APP_URL（本地调试指向 dev server），否则用 config.json，最后回退线上地址
+const APP_URL = (process.env.APP_URL && process.env.APP_URL.trim()) || String(config.appUrl || '').trim() || 'https://word.violet27chen.com/';
 let appOrigin = '';
 try {
   appOrigin = new URL(APP_URL).origin;

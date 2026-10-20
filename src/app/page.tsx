@@ -412,6 +412,7 @@ export default function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const agentImageRef = useRef<HTMLInputElement>(null);
   const [isContentOpen, setIsContentOpen] = useState(false);
   const [wordCount, setWordCount] = useState('');
   const [writingStyle, setWritingStyle] = useState('');
@@ -1348,6 +1349,21 @@ export default function Home() {
       return;
     }
 
+    // 教学模式下，先按对话需求上下文给未标注的图片标注好，再发送
+    const resolvedBase64 = new Map<string, string>();
+    if (teachingDocMode) {
+      const ctx = [content, instruction].filter(Boolean).join('\n').slice(0, 1000);
+      const pending = uploadedImages.filter(im => im.origBase64 && !im.annotated);
+      if (pending.length) {
+        await Promise.all(
+          pending.map(async (im) => {
+            const ab = await runAnnotation(im.id, im.origBase64, ctx);
+            if (ab) resolvedBase64.set(im.id, ab);
+          })
+        );
+      }
+    }
+
     setAgentMessages(prev => [...prev, { role: 'user', content: instruction }]);
     setAgentInput('');
 
@@ -1367,7 +1383,12 @@ export default function Home() {
       enableSignatureDate,
       authorName,
       documentDate,
-      images: uploadedImages.map(img => ({ id: img.id, base64: img.base64, caption: img.caption || '', insertHint: img.insertHint || '' })),
+      images: uploadedImages.map(img => ({
+        id: img.id,
+        base64: resolvedBase64.get(img.id) || img.base64,
+        caption: img.caption || '',
+        insertHint: img.insertHint || '',
+      })),
     };
 
     await executeGenerate(payload, text('analyzingText'), text('generatingText'));
@@ -2060,6 +2081,73 @@ export default function Home() {
                 <div className="p-3 border-t border-gray-100 dark:border-gray-800 shrink-0">
                   {desktopNotice && (
                     <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400 truncate">{desktopNotice}</p>
+                  )}
+                  {/* 图片上传 + 教学标注（与文档模式共用同一套上传/标注链路） */}
+                  <div className="mb-2 flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => agentImageRef.current?.click()}
+                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <ImagePlus className="w-3.5 h-3.5" />
+                      {locale === 'zh' ? `上传图片（${uploadedImages.length}/${MAX_IMAGE_COUNT}）` : `Images (${uploadedImages.length}/${MAX_IMAGE_COUNT})`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTeachingDocMode(!teachingDocMode)}
+                      className={`flex items-center gap-2 text-xs px-2.5 py-1.5 rounded border transition-colors ${teachingDocMode ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300' : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'}`}
+                    >
+                      <span className={`relative w-7 h-3.5 rounded-full transition-colors ${teachingDocMode ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform ${teachingDocMode ? 'translate-x-3.5' : ''}`} />
+                      </span>
+                      {locale === 'zh' ? '教学文档标注' : 'Teaching annotation'}
+                    </button>
+                    <input
+                      type="file"
+                      ref={agentImageRef}
+                      accept="image/*"
+                      multiple
+                      onChange={async (e) => { await handleImageFiles(Array.from(e.target.files || [])); if (agentImageRef.current) agentImageRef.current.value = ''; }}
+                      className="hidden"
+                    />
+                  </div>
+                  {uploadedImages.length > 0 && (
+                    <div className="mb-2 flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+                      {uploadedImages.map((img) => (
+                        <div key={img.id} className="relative group shrink-0 w-16 h-16 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-800">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img.base64} alt="uploaded" className="w-full h-full object-cover" />
+                          {annotatingIds.includes(img.id) && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[9px]">{locale === 'zh' ? '标注中' : 'Annot.'}</div>
+                          )}
+                          {teachingDocMode && img.variant && img.variant > 1 && (
+                            <span className="absolute top-0.5 left-0.5 px-1 rounded bg-indigo-600/90 text-white text-[9px]">{locale === 'zh' ? `副本${img.variant}` : `C${img.variant}`}</span>
+                          )}
+                          <button
+                            onClick={() => removeImage(img.id)}
+                            className="absolute top-0.5 right-0.5 p-0.5 bg-white/80 dark:bg-gray-800/80 hover:bg-red-100 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {teachingDocMode && !annotatingIds.includes(img.id) && (
+                            <button
+                              onClick={() => img.annotated
+                                ? handleReannotate(img, [content, agentInput].filter(Boolean).join('\n').slice(0, 1000))
+                                : runAnnotation(img.id, img.origBase64, [content, agentInput].filter(Boolean).join('\n').slice(0, 1000))}
+                              title={img.annotated
+                                ? (locale === 'zh' ? '基于原图再次标注（新增副本）' : 'Annotate again (new copy)')
+                                : (locale === 'zh' ? '按当前需求标注' : 'Annotate with current need')}
+                              className="absolute bottom-0.5 right-0.5 p-0.5 bg-white/80 dark:bg-gray-800/80 hover:bg-indigo-100 hover:text-indigo-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              {img.annotated ? <RefreshCw className="w-3 h-3" /> : <Wand2 className="w-3 h-3" />}
+                            </button>
+                          )}
+                          {img.annotated && (
+                            <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center truncate">{locale === 'zh' ? `已标${img.annotationCount ?? 0}` : `${img.annotationCount ?? 0} ann.`}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                   <div className="flex items-end gap-2">
                     <textarea
