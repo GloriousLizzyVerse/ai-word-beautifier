@@ -95,6 +95,27 @@ export function deriveHistoryTitle(content: string): string {
   return (firstLine.replace(/[#>*`\-\[\]]/g, '').trim() || 'AI排版美化文档').slice(0, HISTORY_MAX_TITLE_LENGTH);
 }
 
+/** Strips HTML tags and markdown syntax so history snippets show plain text only. */
+export function deriveHistorySnippet(content: string, maxLength = 140): string {
+  const cleaned = (content || '')
+    // block-level html wrappers commonly emitted by the formatter
+    .replace(/<div\s+align=["'](?:center|right)["']>/gi, ' ')
+    .replace(/<\/(?:div|h[1-6]|p|li|ul|ol)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]*)\*\*/g, '$1')
+    .replace(/[*`_>]/g, '')
+    .replace(/^\s*[-—]{3,}\s*$/gm, '')
+    .replace(/[ \t]+/g, ' ')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength)}…` : cleaned;
+}
+
 export async function saveGenerationHistory(input: {
   userId: string;
   title: string;
@@ -133,19 +154,28 @@ export async function listGenerationHistory(userId: string, page: number): Promi
   if (database.kind === 'd1') {
     const db = database.db as D1Database;
     const countRow = await db.prepare('SELECT COUNT(*) AS total FROM app_generation_history WHERE user_id = ?').bind(userId).first<{ total: number }>();
-    const rows = await db.prepare(`SELECT id, title, substr(content, 1, 200) AS snippet, word_count AS wordCount, created_at AS createdAt
+    const rows = await db.prepare(`SELECT id, title, substr(content, 1, 800) AS snippet, word_count AS wordCount, created_at AS createdAt
       FROM app_generation_history WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`)
       .bind(userId, HISTORY_PAGE_SIZE, offset).all<GenerationHistoryItem>();
-    return { items: rows.results || [], total: Number(countRow?.total) || 0, page: safePage, pageSize: HISTORY_PAGE_SIZE };
+    return {
+      items: (rows.results || []).map((row) => ({ ...row, snippet: deriveHistorySnippet(row.snippet), wordCount: Number(row.wordCount) || 0 })),
+      total: Number(countRow?.total) || 0,
+      page: safePage,
+      pageSize: HISTORY_PAGE_SIZE,
+    };
   }
 
   const db = database.db as mysql.Pool;
   const [countRows] = await db.query('SELECT COUNT(*) AS total FROM app_generation_history WHERE user_id = ?', [userId]) as [mysql.RowDataPacket[], unknown];
-  const [rows] = await db.query(`SELECT id, title, LEFT(content, 200) AS snippet, word_count AS wordCount, created_at AS createdAt
+  const [rows] = await db.query(`SELECT id, title, LEFT(content, 800) AS snippet, word_count AS wordCount, created_at AS createdAt
     FROM app_generation_history WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
     [userId, HISTORY_PAGE_SIZE, offset]) as [mysql.RowDataPacket[], unknown];
   return {
-    items: (rows as GenerationHistoryItem[]).map((row) => ({ ...row, wordCount: Number(row.wordCount) || 0 })),
+    items: (rows as GenerationHistoryItem[]).map((row) => ({
+      ...row,
+      snippet: deriveHistorySnippet(String(row.snippet || '')),
+      wordCount: Number(row.wordCount) || 0,
+    })),
     total: Number((countRows[0] as { total: number } | undefined)?.total) || 0,
     page: safePage,
     pageSize: HISTORY_PAGE_SIZE,

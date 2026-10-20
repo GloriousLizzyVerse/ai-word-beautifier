@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check, History, RotateCcw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check, History, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ThemeToggle from '@/components/theme-toggle';
@@ -247,6 +247,7 @@ export default function Home() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [historyConfirm, setHistoryConfirm] = useState<{ type: 'restore' | 'delete'; id: string; title: string } | null>(null);
 
   useEffect(() => {
     setLocale(resolveInitialLocale());
@@ -347,10 +348,10 @@ export default function Home() {
   };
 
   const handleDeleteHistory = async (id: string) => {
-    if (!window.confirm(locale === 'zh' ? '确定删除这条历史记录吗？' : 'Delete this history entry?')) return;
     try {
       const response = await fetch(`/api/history/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('delete_failed');
+      setHistoryConfirm(null);
       const remaining = historyItems.length - 1;
       const nextPage = remaining === 0 && historyPage > 1 ? historyPage - 1 : historyPage;
       await loadHistory(nextPage);
@@ -369,6 +370,7 @@ export default function Home() {
       fullTextRef.current = data.item.content;
       setDisplayedMarkdown(data.item.content);
       setError(null);
+      setHistoryConfirm(null);
       setIsHistoryOpen(false);
     } catch {
       setHistoryError(locale === 'zh' ? '恢复失败，请重试。' : 'Failed to restore. Please retry.');
@@ -2033,7 +2035,14 @@ export default function Home() {
               ) : (
                 <div className="space-y-3">
                   {historyItems.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+                    <div
+                      key={item.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setHistoryConfirm({ type: 'restore', id: item.id, title: item.title })}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setHistoryConfirm({ type: 'restore', id: item.id, title: item.title }); }}
+                      className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50/40 dark:hover:bg-indigo-900/20 transition-colors"
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{item.title}</p>
@@ -2046,22 +2055,13 @@ export default function Home() {
                             <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 whitespace-pre-wrap break-words">{item.snippet}</p>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => handleRestoreHistory(item.id)}
-                            title={locale === 'zh' ? '恢复到预览区' : 'Restore to preview'}
-                            className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteHistory(item.id)}
-                            title={locale === 'zh' ? '删除' : 'Delete'}
-                            className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setHistoryConfirm({ type: 'delete', id: item.id, title: item.title }); }}
+                          title={locale === 'zh' ? '删除' : 'Delete'}
+                          className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -2091,6 +2091,45 @@ export default function Home() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* History Confirm Modal */}
+      {historyConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-200">
+                {historyConfirm.type === 'restore' ? (locale === 'zh' ? '恢复到预览区' : 'Restore to preview') : (locale === 'zh' ? '删除这条记录' : 'Delete this entry')}
+              </h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 break-words">
+                {historyConfirm.type === 'restore'
+                  ? (locale === 'zh'
+                    ? `将把「${historyConfirm.title}」的内容恢复到预览区，当前预览内容会被替换。`
+                    : `"${historyConfirm.title}" will be restored to the preview area and replace the current content.`)
+                  : (locale === 'zh'
+                    ? `确定删除「${historyConfirm.title}」吗？删除后无法恢复。`
+                    : `Delete "${historyConfirm.title}"? This cannot be undone.`)}
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 px-5 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
+              <button
+                onClick={() => setHistoryConfirm(null)}
+                className="py-2 px-4 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                {locale === 'zh' ? '取消' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => (historyConfirm.type === 'restore' ? handleRestoreHistory(historyConfirm.id) : handleDeleteHistory(historyConfirm.id))}
+                className={cn(
+                  'py-2 px-4 rounded-lg text-sm font-medium text-white shadow-sm transition-colors',
+                  historyConfirm.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                )}
+              >
+                {historyConfirm.type === 'restore' ? (locale === 'zh' ? '确认恢复' : 'Restore') : (locale === 'zh' ? '确认删除' : 'Delete')}
+              </button>
+            </div>
           </div>
         </div>
       )}
