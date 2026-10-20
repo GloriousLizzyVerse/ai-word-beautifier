@@ -1648,7 +1648,7 @@ export default function Home() {
           </div>
 
           {/* Middle Column: Inputs */}
-          <div className="w-full lg:w-[45%] lg:h-full lg:overflow-y-auto lg:pr-2 pb-6 space-y-6 custom-scrollbar">
+          <div className="w-full lg:w-[45%] lg:h-full lg:overflow-y-auto lg:pr-2 pb-6 space-y-6 hide-scrollbar">
             {/* Settings Card */}
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center gap-2 mb-4 text-gray-800 dark:text-gray-200">
