@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check, History, Trash2, ChevronLeft, ChevronRight, FolderOpen, MessageSquare, PanelRightOpen, PanelRightClose, FileDown, Send } from 'lucide-react';
+import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check, History, Trash2, ChevronLeft, ChevronRight, FolderOpen, MessageSquare, PanelRightOpen, PanelRightClose, FileDown, Send, RefreshCw } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ThemeToggle from '@/components/theme-toggle';
@@ -766,11 +766,13 @@ export default function Home() {
   const [uploadedImages, setUploadedImages] = useState<{
     id: string;
     base64: string;
+    origBase64: string;
     file: File;
     annotated?: boolean;
     annotationCount?: number;
     caption?: string;
     insertHint?: string;
+    variant?: number;
   }[]>([]);
   const [teachingDocMode, setTeachingDocMode] = useState(false);
   const [annotatingIds, setAnnotatingIds] = useState<string[]>([]);
@@ -859,6 +861,14 @@ export default function Home() {
 
   const drawAnnotations = (base64: string, annotations: AnnotShape[]): Promise<string> =>
     new Promise((resolve, reject) => {
+      // 兜底：最多 2 处，丢弃过大（近半图/整行整列）或超长的标注
+      const anns = annotations
+        .filter((a) => {
+          if (a.type === 'box' || a.type === 'ellipse') return a.w <= 0.5 && a.h <= 0.5;
+          if (a.type === 'arrow') return Math.hypot(a.x2 - a.x1, a.y2 - a.y1) <= 0.9;
+          return true;
+        })
+        .slice(0, 2);
       const img = new Image();
       img.onload = () => {
         const natW = img.naturalWidth || img.width;
@@ -923,22 +933,29 @@ export default function Home() {
           return lines.slice(0, 6);
         };
 
-        annotations.forEach((a, i) => {
+        const chipH = fontPx + fontPx * 0.35;
+        anns.forEach((a, i) => {
           if (a.type === 'box') {
-            const rx = a.x * W;
-            const ry = a.y * H;
-            const rw = a.w * W;
-            const rh = a.h * H;
+            // 钳制在画布内，避免贴边/出界
+            const rx = Math.max(2, Math.min(a.x * W, W - 4));
+            const ry = Math.max(2, Math.min(a.y * H, H - 4));
+            const rw = Math.max(4, Math.min(a.w * W, W - rx - 2));
+            const rh = Math.max(4, Math.min(a.h * H, H - ry - 2));
             ctx.fillStyle = 'rgba(220,38,38,0.10)';
             ctx.fillRect(rx, ry, rw, rh);
             ctx.strokeStyle = COLORS.box;
             ctx.strokeRect(rx, ry, rw, rh);
-            drawLabelChip(a.label || `区域 ${i + 1}`, rx, ry - (fontPx + fontPx * 0.35), COLORS.box);
+            // 标签优先放框上方；框太靠上则放框内左上角，避免压到图片顶端
+            drawLabelChip(a.label || `区域 ${i + 1}`, rx, ry >= chipH + 4 ? ry - chipH - 2 : ry + 4, COLORS.box);
           } else if (a.type === 'ellipse') {
-            const cx = a.x * W + (a.w * W) / 2;
-            const cy = a.y * H + (a.h * H) / 2;
-            const rx = (a.w * W) / 2;
-            const ry = (a.h * H) / 2;
+            const rxRaw = Math.max(2, Math.min(a.x * W, W - 4));
+            const ryRaw = Math.max(2, Math.min(a.y * H, H - 4));
+            const rw = Math.max(4, Math.min(a.w * W, W - rxRaw - 2));
+            const rh = Math.max(4, Math.min(a.h * H, H - ryRaw - 2));
+            const cx = rxRaw + rw / 2;
+            const cy = ryRaw + rh / 2;
+            const rx = rw / 2;
+            const ry = rh / 2;
             ctx.fillStyle = 'rgba(22,163,74,0.10)';
             ctx.beginPath();
             ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
@@ -947,7 +964,7 @@ export default function Home() {
             ctx.beginPath();
             ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
             ctx.stroke();
-            drawLabelChip(a.label || `重点 ${i + 1}`, a.x * W, a.y * H - (fontPx + fontPx * 0.35), COLORS.ellipse);
+            drawLabelChip(a.label || `重点 ${i + 1}`, rxRaw, ryRaw >= chipH + 4 ? ryRaw - chipH - 2 : ryRaw + 4, COLORS.ellipse);
           } else if (a.type === 'arrow') {
             const x1 = a.x1 * W;
             const y1 = a.y1 * H;
@@ -1004,6 +1021,61 @@ export default function Home() {
       img.src = base64;
     });
 
+  const runAnnotation = async (id: string, base64: string) => {
+    setAnnotatingIds(prev => Array.from(new Set([...prev, id])));
+    try {
+      const res = await fetch('/api/annotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ image: { id, base64 }, locale }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const annotations: AnnotShape[] = (Array.isArray(data.annotations) ? data.annotations : []).slice(0, 2);
+        const patch: {
+          annotated: boolean;
+          base64?: string;
+          annotationCount: number;
+          caption: string;
+          insertHint: string;
+        } = {
+          annotated: true,
+          annotationCount: annotations.length,
+          caption: typeof data.caption === 'string' ? data.caption : '',
+          insertHint: typeof data.insertHint === 'string' ? data.insertHint : '',
+        };
+        if (annotations.length) {
+          patch.base64 = await drawAnnotations(base64, annotations);
+        }
+        setUploadedImages(prev => prev.map(im => (im.id === id ? { ...im, ...patch } : im)));
+      } else if (res.status === 401) {
+        setError(locale === 'zh' ? '请先登录后使用图片标注。' : 'Sign in to use image annotation.');
+      }
+    } catch {
+      // 标注失败则保留原图
+    } finally {
+      setAnnotatingIds(prev => prev.filter(x => x !== id));
+    }
+  };
+
+  // 一图多用：基于同一张原图再生成一份新的标注副本（不覆盖已有副本）
+  const handleReannotate = (img: { id: string; base64: string; origBase64: string; file: File }) => {
+    if (uploadedImages.length >= MAX_IMAGE_COUNT) {
+      setError(locale === 'zh' ? `最多上传 ${MAX_IMAGE_COUNT} 张图片。` : `You can upload up to ${MAX_IMAGE_COUNT} images.`);
+      return;
+    }
+    const src = img.origBase64 || img.base64;
+    const newId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    setUploadedImages(prev => {
+      const maxVariant = prev
+        .filter(p => p.file === img.file)
+        .reduce((m, p) => Math.max(m, p.variant || 1), 1);
+      return [...prev, { id: newId, base64: src, origBase64: src, file: img.file, variant: maxVariant + 1 }];
+    });
+    runAnnotation(newId, src);
+  };
+
   const handleImageFiles = async (files: File[]) => {
     if (!files.length) return;
 
@@ -1026,44 +1098,10 @@ export default function Home() {
           ? await convertGifToPngDataUrl(file)
           : await readFileAsDataUrl(file);
         const id = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        setUploadedImages(prev => [...prev, { id, base64, file }]);
+        setUploadedImages(prev => [...prev, { id, base64, origBase64: base64, file, variant: 1 }]);
 
         if (teachingDocMode) {
-          setAnnotatingIds(prev => Array.from(new Set([...prev, id])));
-          try {
-            const res = await fetch('/api/annotate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ image: { id, base64 }, locale }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              const annotations: AnnotShape[] = Array.isArray(data.annotations) ? data.annotations : [];
-              const patch: {
-                annotated: boolean;
-                base64?: string;
-                annotationCount: number;
-                caption: string;
-                insertHint: string;
-              } = {
-                annotated: true,
-                annotationCount: annotations.length,
-                caption: typeof data.caption === 'string' ? data.caption : '',
-                insertHint: typeof data.insertHint === 'string' ? data.insertHint : '',
-              };
-              if (annotations.length) {
-                patch.base64 = await drawAnnotations(base64, annotations);
-              }
-              setUploadedImages(prev => prev.map(im => (im.id === id ? { ...im, ...patch } : im)));
-            } else if (res.status === 401) {
-              setError(locale === 'zh' ? '请先登录后使用图片标注。' : 'Sign in to use image annotation.');
-            }
-          } catch {
-            // 标注失败则保留原图
-          } finally {
-            setAnnotatingIds(prev => prev.filter(x => x !== id));
-          }
+          await runAnnotation(id, base64);
         }
       } catch {
         setError(locale === 'zh' ? `图片处理失败：${file.name}` : `Failed to process image: ${file.name}`);
@@ -2317,7 +2355,7 @@ export default function Home() {
                 </div>
                 {teachingDocMode && (
                   <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 p-2 rounded-md flex items-start gap-1">
-                    <span>{locale === 'zh' ? '教学文档模式：图片上传后 AI 会自动识别关键点并在图上标注，再随文档一起导出。' : 'Teaching mode: uploads are auto-annotated with key points, then inserted into the document.'}</span>
+                    <span>{locale === 'zh' ? '教学文档模式：图片上传后 AI 会自动挑出 1~2 个关键点做紧凑标注（框选/箭头/椭圆/旁注），再随文档一起导出。' : 'Teaching mode: uploads are auto-annotated with 1~2 key points (box/arrow/ellipse/note), then inserted into the document.'}</span>
                   </div>
                 )}
               </div>
@@ -2336,12 +2374,26 @@ export default function Home() {
                       {locale === 'zh' ? '标注中…' : 'Annotating…'}
                     </div>
                   )}
+                  {teachingDocMode && img.variant && img.variant > 1 && (
+                    <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-indigo-600/90 text-white text-[10px] font-medium">
+                      {locale === 'zh' ? `副本${img.variant}` : `Copy ${img.variant}`}
+                    </span>
+                  )}
                   <button
                     onClick={() => removeImage(img.id)}
                     className="absolute top-2 right-2 p-1 bg-white/80 dark:bg-gray-800/80 hover:bg-red-100 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-4 h-4" />
                   </button>
+                  {teachingDocMode && !annotatingIds.includes(img.id) && (
+                    <button
+                      onClick={() => handleReannotate(img)}
+                      title={locale === 'zh' ? '基于原图再次标注（新增一份副本）' : 'Annotate again from the original (new copy)'}
+                      className="absolute bottom-2 right-2 p-1 bg-white/80 dark:bg-gray-800/80 hover:bg-indigo-100 hover:text-indigo-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  )}
                   <div
                     className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-2 py-1 truncate"
                     title={img.caption ? `${img.caption}${img.insertHint ? '｜' + img.insertHint : ''}` : undefined}

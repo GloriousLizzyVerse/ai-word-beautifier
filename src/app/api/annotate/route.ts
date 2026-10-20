@@ -20,6 +20,19 @@ function clamp01(v: number, fallback: number): number {
   return Math.min(Math.max(v, 0), 1);
 }
 
+const MAX_ANNOTATIONS = 2;
+
+// 校验单条标注：数量之外，还要保证"小而准"——过大或贴边的框直接丢弃
+function isReasonable(a: Annotation): boolean {
+  if (a.type === 'box' || a.type === 'ellipse') {
+    // 面积过大（覆盖近半图或整行整列）视为无效
+    if (a.w > 0.45 || a.h > 0.45) return false;
+    if (a.w < 0.03 || a.h < 0.03) return false;
+    return true;
+  }
+  return true;
+}
+
 function toAnnotation(raw: any): Annotation | null {
   const t = raw?.type;
   if (t === 'box' || t === 'ellipse') {
@@ -74,22 +87,21 @@ const ZH_PROMPT = `你是一名「教学文档智能标注助手」。请像老�
 
 {
   "annotations": [
-    { "type": "box", "label": "标题栏", "x": 0.12, "y": 0.08, "w": 0.40, "h": 0.12 },
-    { "type": "ellipse", "label": "核心按钮", "x": 0.60, "y": 0.45, "w": 0.18, "h": 0.10 },
-    { "type": "arrow", "label": "指向数据区", "x1": 0.30, "y1": 0.72, "x2": 0.55, "y2": 0.55 },
-    { "type": "text", "text": "此处为用户登录入口", "x": 0.04, "y": 0.30 }
+    { "type": "box", "label": "登录按钮", "x": 0.62, "y": 0.40, "w": 0.16, "h": 0.08 },
+    { "type": "arrow", "label": "密码输入框", "x1": 0.30, "y1": 0.72, "x2": 0.45, "y2": 0.55 }
   ],
   "caption": "本图展示了一个后台管理系统的登录与首页布局。",
   "insertHint": "建议插入到「系统使用说明」章节的「界面概览」小节附近。"
 }
 
-坐标规则（重要）：
+坐标规则（非常重要，必须严格遵守）：
 - x/y/w/h 与 x1/y1/x2/y2 均为相对图片宽高的归一化数值，范围 0~1。
 - box / ellipse 的 x,y 是区域左上角，w,h 是宽高；若为负值表示向左/上偏移。
 - arrow 的 (x1,y1) 是箭头起点，(x2,y2) 是箭头指向的、被说明的位置。
 - text 的 x,y 是说明文字气泡的左上角位置。
-- 请综合使用多种标注：box 圈出区域、ellipse 高亮重点、arrow 指向并配合 label、text 写独立旁注。
-- 标注数量建议 3~8 个，覆盖图片中最值得讲解的元素；label/text 用简体中文、简洁准确。`;
+- 数量限制：最多 2 处标注，宁少勿多；只挑选图中最值得讲解的 1~2 个关键元素。
+- 尺寸限制：每处标注必须紧贴目标元素本身（紧凑框选），w 和 h 都不得超过 0.35；严禁框住整行、整列、半个画面或整个画面；框边不得贴着图片边缘，区域四边都应与图片边缘保持至少 0.03 的间距。
+- label/text 用简体中文、不超过 8 个字、简洁准确。`;
 
 const EN_PROMPT = `You are a "teaching-document annotation assistant". Analyze this image like a teacher preparing a lesson: mark the key structures and give a teaching description.
 
@@ -97,10 +109,8 @@ Output ONLY a JSON object (no explanation, no markdown code fences), matching ex
 
 {
   "annotations": [
-    { "type": "box", "label": "Title bar", "x": 0.12, "y": 0.08, "w": 0.40, "h": 0.12 },
-    { "type": "ellipse", "label": "Core button", "x": 0.60, "y": 0.45, "w": 0.18, "h": 0.10 },
-    { "type": "arrow", "label": "Points to data area", "x1": 0.30, "y1": 0.72, "x2": 0.55, "y2": 0.55 },
-    { "type": "text", "text": "This is the user login entry", "x": 0.04, "y": 0.30 }
+    { "type": "box", "label": "Login button", "x": 0.62, "y": 0.40, "w": 0.16, "h": 0.08 },
+    { "type": "arrow", "label": "Password field", "x1": 0.30, "y1": 0.72, "x2": 0.45, "y2": 0.55 }
   ],
   "caption": "The image shows the login and home layout of an admin dashboard.",
   "insertHint": "Suggest inserting near the 'Interface Overview' subsection of the 'System Guide' chapter."
@@ -111,8 +121,10 @@ Coordinate rules:
 - For box/ellipse, x,y is top-left, w,h is size; negative means offset left/up.
 - For arrow, (x1,y1) is the start, (x2,y2) is the pointed-to location.
 - For text, x,y is the top-left of the note bubble.
-- Use a mix: box to outline, ellipse to highlight, arrow to point (with label), text for standalone notes.
-- Provide 3~8 annotations covering the most instructive elements; keep labels concise.`;
+Quantity limit: at most 2 annotations — fewer is better; pick only the 1~2 most instructive elements.
+Size limit: each annotation must tightly fit the target element itself; both w and h must not exceed 0.35; NEVER outline an entire row, column, half or whole image; keep every edge of a region at least 0.03 away from the image borders.
+- Use a mix if helpful: box to outline, ellipse to highlight, arrow to point (with label), text for standalone notes.
+- Keep labels concise (no more than 8 words).`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -177,9 +189,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const annotations: Annotation[] = Array.isArray(parsed.annotations)
+    const annotations: Annotation[] = (Array.isArray(parsed.annotations)
       ? parsed.annotations.map(toAnnotation).filter((a): a is Annotation => a !== null)
-      : [];
+      : []
+    )
+      .filter(isReasonable)
+      .slice(0, MAX_ANNOTATIONS);
 
     const caption = typeof parsed.caption === 'string' ? parsed.caption.slice(0, 300) : '';
     const insertHint = typeof parsed.insertHint === 'string' ? parsed.insertHint.slice(0, 300) : '';
