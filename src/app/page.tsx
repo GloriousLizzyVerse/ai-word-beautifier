@@ -256,7 +256,7 @@ export default function Home() {
   const [workingDir, setWorkingDir] = useState('');
   const [appMode, setAppMode] = useState<'doc' | 'agent'>('doc');
   const [agentInput, setAgentInput] = useState('');
-  const [agentMessages, setAgentMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string; savedPath?: string }[]>([]);
+  const [agentMessages, setAgentMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string; savedPath?: string; isError?: boolean }[]>([]);
   const agentStreamId = useRef<string | null>(null);
   const [showAgentPreview, setShowAgentPreview] = useState(false);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceDoc[]>([]);
@@ -1208,9 +1208,11 @@ export default function Home() {
           setRequiresLogin(true);
           if (savePendingGenerationDraft()) router.push('/login?returnTo=%2F');
           else setError(locale === 'zh' ? '无法暂存当前内容，请复制保存后再登录。' : 'Unable to save your draft. Please copy it before signing in.');
-          throw new Error('AUTH_REQUIRED');
+          return { ok: false, error: locale === 'zh' ? '请先登录账号，再使用文档生成服务。' : 'Please sign in before using document generation.' };
         }
-        throw new Error(errorData.error || (locale === 'zh' ? '生成失败，请检查网络或重试' : 'Request failed. Please try again.'));
+        const code = (errorData.code || '').toLowerCase();
+        const errMsg = [errorData.error || '', code].filter(Boolean).join(' ') || (locale === 'zh' ? '生成失败，请检查网络或重试' : 'Request failed. Please try again.');
+        throw new Error(errMsg);
       }
 
       if (!response.body) throw new Error('ReadableStream not supported');
@@ -1248,7 +1250,7 @@ export default function Home() {
           void saveCurrentDocToWorkspace(undefined, finalText);
         }
       }
-
+      return { ok: true };
     } catch (err) {
       console.error('Generation Error:', err);
       const e = err as Error;
@@ -1274,6 +1276,7 @@ export default function Home() {
       }
 
       setError(errorMsg);
+      return { ok: false, error: errorMsg };
     } finally {
       setIsFetching(false);
       setStatusMsg('');
@@ -1398,15 +1401,20 @@ export default function Home() {
       })),
     };
 
-    await executeGenerate(payload, text('analyzingText'), text('generatingText'), (full) => {
+    const res = await executeGenerate(payload, text('analyzingText'), text('generatingText'), (full) => {
       setAgentMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: full } : m));
     });
 
     const result = fullTextRef.current;
     agentStreamId.current = null;
-    if (!result.trim()) {
-      // 生成失败/空结果：移除空助手气泡，避免残留空白气泡
-      setAgentMessages(prev => prev.filter(m => m.id !== assistantId));
+
+    if (!res.ok || !result.trim()) {
+      // 生成失败/空结果：把错误作为左侧助手气泡反馈，而非静默移除气泡
+      const errMsg = res.error || (locale === 'zh' ? '未能生成内容，请稍后重试。' : 'No content generated. Please try again.');
+      setAgentMessages(prev => prev.map(m => m.id === assistantId
+        ? { ...m, content: errMsg, isError: true }
+        : m));
+      setError(null); // 错误已由气泡承载，避免 composer 重复提示
       return;
     }
     const saved = isDesktopClient && workingDir
@@ -2059,10 +2067,17 @@ export default function Home() {
                         'max-w-[82%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words',
                         msg.role === 'user'
                           ? 'bg-indigo-600 text-white rounded-br-md'
-                          : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-bl-md'
+                          : msg.isError
+                            ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 border border-red-300 dark:border-red-700 rounded-bl-md'
+                            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-bl-md'
                       )}>
                         {msg.role === 'assistant' ? (
-                          msg.content ? (
+                          msg.isError ? (
+                            <span className="flex items-start gap-1.5">
+                              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                              <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+                            </span>
+                          ) : msg.content ? (
                             <>
                               <p className="line-clamp-6">{msg.content}</p>
                               {agentStreamId.current !== msg.id && (
@@ -2098,6 +2113,12 @@ export default function Home() {
               <div className="px-1 pb-1 pt-2 shrink-0">
                 {desktopNotice && (
                   <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400 truncate">{desktopNotice}</p>
+                )}
+                {error && (
+                  <p className="mb-2 flex items-center gap-1 text-xs text-red-500 dark:text-red-400 truncate">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{error}</span>
+                  </p>
                 )}
                 <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/40 focus-within:border-indigo-400 transition-all">
                   {/* 缩略图：收进 composer 顶部，仅在有图时出现 */}
