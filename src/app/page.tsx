@@ -2007,116 +2007,105 @@ export default function Home() {
 
           {agentActive ? (
             <div className="flex-1 min-h-0 flex gap-4">
-              {/* Agent chat panel */}
-              <div className="flex-1 min-w-0 flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                  <div className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
-                    <MessageSquare className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-                    <h2 className="font-semibold">{locale === 'zh' ? '对话生成' : 'Chat to generate'}</h2>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[180px]">{workingDir}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAgentPreview(!showAgentPreview)}
-                    className="flex items-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    {showAgentPreview ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-                    {showAgentPreview ? (locale === 'zh' ? '收起预览' : 'Hide preview') : (locale === 'zh' ? '展开预览' : 'Show preview')}
-                  </button>
-                </div>
-
-                <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar p-4 space-y-4">
-                  {agentMessages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 dark:text-gray-500 gap-2">
-                      <MessageSquare className="w-8 h-8" />
-                      <p className="text-sm">{locale === 'zh' ? '用一句话描述你要整理的文稿，剩下的交给对话。' : 'Describe the document you need in one sentence.'}</p>
-                      <p className="text-xs">{locale === 'zh' ? '生成结果会自动保存到当前工作目录。' : 'Results are saved to the current working folder automatically.'}</p>
-                    </div>
-                  ) : (
-                    agentMessages.map((msg, index) => (
-                      <div key={index} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                        <div className={cn(
-                          'max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words',
-                          msg.role === 'user'
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-                        )}>
-                          {msg.role === 'assistant' ? (
-                            <>
-                              <p className="line-clamp-6">{msg.content}</p>
-                              {msg.savedPath ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenWorkspaceFile(msg.savedPath!.split(/[\\/]/).pop() || '')}
-                                  className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                                >
-                                  <FileDown className="w-3.5 h-3.5" />
-                                  {msg.savedPath.split(/[\\/]/).pop()}
-                                </button>
-                              ) : (
-                                <span className="mt-2 block text-xs text-gray-400 dark:text-gray-500">
-                                  {locale === 'zh' ? '（未选择工作目录，未自动保存）' : '(No workspace selected, not saved)'}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            msg.content
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  {(isFetching || isTyping) && (
-                    <div className="flex justify-start">
-                      <div className="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-xl px-3.5 py-2.5 text-sm flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {statusMsg || text('generatingDefault')}
-                      </div>
-                    </div>
+              {/* 对话列 */}
+              <div className="flex-1 min-w-0 flex flex-col">
+              {/* 顶栏：极简，仅标题 + 工作目录小标签 + 预览开关 */}
+              <div className="flex items-center justify-between px-1 py-2 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <MessageSquare className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{locale === 'zh' ? '对话生成' : 'Chat to generate'}</span>
+                  {workingDir && (
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[200px]">· {workingDir}</span>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAgentPreview(!showAgentPreview)}
+                  title={showAgentPreview ? (locale === 'zh' ? '收起预览' : 'Hide preview') : (locale === 'zh' ? '展开预览' : 'Show preview')}
+                  className="shrink-0 p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                >
+                  {showAgentPreview ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                </button>
+              </div>
 
-                <div className="p-3 border-t border-gray-100 dark:border-gray-800 shrink-0">
-                  {desktopNotice && (
-                    <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400 truncate">{desktopNotice}</p>
-                  )}
-                  {/* 图片上传：单个按钮通吃普通文档与教学文档（一按钮多用）；标注在发送/对话开始后按需求读取 */}
-                  <div className="mb-2 flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => agentImageRef.current?.click()}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      <ImagePlus className="w-3.5 h-3.5" />
-                      {locale === 'zh' ? `上传图片（${uploadedImages.length}/${MAX_IMAGE_COUNT}）` : `Images (${uploadedImages.length}/${MAX_IMAGE_COUNT})`}
-                    </button>
-                    <input
-                      type="file"
-                      ref={agentImageRef}
-                      accept="image/*"
-                      multiple
-                      onChange={async (e) => { await handleImageFiles(Array.from(e.target.files || [])); if (agentImageRef.current) agentImageRef.current.value = ''; }}
-                      className="hidden"
-                    />
+              {/* 对话区 */}
+              <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar px-1 py-3 space-y-4">
+                {agentMessages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 dark:text-gray-500 gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                      <MessageSquare className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
+                    </div>
+                    <p className="text-sm max-w-xs">{locale === 'zh' ? '用一句话描述你要整理的文稿，剩下的交给对话。' : 'Describe the document you need in one sentence.'}</p>
+                    <p className="text-xs">{locale === 'zh' ? '生成结果会自动保存到当前工作目录。' : 'Results are saved to the current working folder automatically.'}</p>
                   </div>
-                  {/* 图片缩略图：标注/副本/删除复用与文档模式相同的按钮 */}
+                ) : (
+                  agentMessages.map((msg, index) => (
+                    <div key={index} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      <div className={cn(
+                        'max-w-[82%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words',
+                        msg.role === 'user'
+                          ? 'bg-indigo-600 text-white rounded-br-md'
+                          : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-bl-md'
+                      )}>
+                        {msg.role === 'assistant' ? (
+                          <>
+                            <p className="line-clamp-6">{msg.content}</p>
+                            {msg.savedPath ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenWorkspaceFile(msg.savedPath!.split(/[\\/]/).pop() || '')}
+                                className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                              >
+                                <FileDown className="w-3.5 h-3.5" />
+                                {msg.savedPath.split(/[\\/]/).pop()}
+                              </button>
+                            ) : (
+                              <span className="mt-2 block text-xs text-gray-400 dark:text-gray-500">
+                                {locale === 'zh' ? '（未选择工作目录，未自动保存）' : '(No workspace selected, not saved)'}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          msg.content
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+                {(isFetching || isTyping) && (
+                  <div className="flex justify-start">
+                    <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {statusMsg || text('generatingDefault')}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 底部 composer：干净的单条输入框 */}
+              <div className="px-1 pb-1 pt-2 shrink-0">
+                {desktopNotice && (
+                  <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400 truncate">{desktopNotice}</p>
+                )}
+                <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/40 focus-within:border-indigo-400 transition-all">
+                  {/* 缩略图：收进 composer 顶部，仅在有图时出现 */}
                   {uploadedImages.length > 0 && (
-                    <div className="mb-2 flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+                    <div className="flex gap-1.5 overflow-x-auto hide-scrollbar pb-2 mb-1">
                       {uploadedImages.map((img) => (
-                        <div key={img.id} className="relative group shrink-0 w-16 h-16 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-800">
+                        <div key={img.id} className="relative group shrink-0 w-12 h-12 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-800">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={img.base64} alt="uploaded" className="w-full h-full object-cover" />
                           {annotatingIds.includes(img.id) && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[9px]">{locale === 'zh' ? '标注中' : 'Annot.'}</div>
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[8px]">{locale === 'zh' ? '标注中' : 'Annot.'}</div>
                           )}
                           {img.variant && img.variant > 1 && (
-                            <span className="absolute top-0.5 left-0.5 px-1 rounded bg-indigo-600/90 text-white text-[9px]">{locale === 'zh' ? `副本${img.variant}` : `C${img.variant}`}</span>
+                            <span className="absolute top-0.5 left-0.5 px-1 rounded bg-indigo-600/90 text-white text-[8px]">{locale === 'zh' ? `副本${img.variant}` : `C${img.variant}`}</span>
                           )}
                           <button
                             onClick={() => removeImage(img.id)}
                             className="absolute top-0.5 right-0.5 p-0.5 bg-white/80 dark:bg-gray-800/80 hover:bg-red-100 hover:text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-2.5 h-2.5" />
                           </button>
                           {!annotatingIds.includes(img.id) && (
                             <button
@@ -2128,55 +2117,69 @@ export default function Home() {
                                 : (locale === 'zh' ? '按当前需求标注' : 'Annotate with current need')}
                               className="absolute bottom-0.5 right-0.5 p-0.5 bg-white/80 dark:bg-gray-800/80 hover:bg-indigo-100 hover:text-indigo-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                             >
-                              {img.annotated ? <RefreshCw className="w-3 h-3" /> : <Wand2 className="w-3 h-3" />}
+                              {img.annotated ? <RefreshCw className="w-2.5 h-2.5" /> : <Wand2 className="w-2.5 h-2.5" />}
                             </button>
                           )}
                           {img.annotated && (
-                            <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center truncate">{locale === 'zh' ? `已标${img.annotationCount ?? 0}` : `${img.annotationCount ?? 0} ann.`}</span>
+                            <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[8px] text-center truncate">{locale === 'zh' ? `已标${img.annotationCount ?? 0}` : `${img.annotationCount ?? 0} ann.`}</span>
                           )}
                         </div>
                       ))}
                     </div>
                   )}
-                  <div className="flex items-end gap-2">
+                  <div className="flex items-end gap-1">
+                    <input
+                      type="file"
+                      ref={agentImageRef}
+                      accept="image/*"
+                      multiple
+                      onChange={async (e) => { await handleImageFiles(Array.from(e.target.files || [])); if (agentImageRef.current) agentImageRef.current.value = ''; }}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => agentImageRef.current?.click()}
+                      title={locale === 'zh' ? '上传图片（普通/教学文档通用）' : 'Upload images'}
+                      className="shrink-0 p-2 rounded-xl text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      <ImagePlus className="w-5 h-5" />
+                    </button>
                     <textarea
                       value={agentInput}
                       onChange={(e) => setAgentInput(e.target.value)}
                       onPasteCapture={handleImagePaste}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
-                      placeholder={locale === 'zh' ? '描述你要整理的文稿；可直接粘贴图片（Ctrl+V）作教学标注，Enter 发送' : 'Describe the document; paste images (Ctrl+V) for annotation, Enter to send'}
-                      rows={2}
-                      className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                      placeholder={locale === 'zh' ? '描述你要整理的文稿；可粘贴图片作教学标注，Enter 发送' : 'Describe the document; paste images for annotation, Enter to send'}
+                      rows={1}
+                      className="flex-1 bg-transparent border-0 px-1 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none resize-none leading-relaxed max-h-32"
                     />
                     <button
                       type="button"
                       onClick={handleAgentSend}
                       disabled={isFetching || isTyping || !agentInput.trim()}
-                      className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white px-4 py-2.5 text-sm font-medium transition-colors"
+                      className="shrink-0 inline-flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-200 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 text-white w-9 h-9 transition-colors"
                     >
                       {isFetching || isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                      {locale === 'zh' ? '发送' : 'Send'}
                     </button>
                   </div>
-                  {workspaceFiles.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{locale === 'zh' ? '工作目录文件' : 'Workspace files'}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {workspaceFiles.slice(0, 8).map((file) => (
-                          <button
-                            key={file.name}
-                            type="button"
-                            onClick={() => handleOpenWorkspaceFile(file.name)}
-                            className="max-w-[160px] truncate rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            title={file.name}
-                          >
-                            {file.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
+                {workspaceFiles.length > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500">{locale === 'zh' ? '工作目录' : 'Workspace'}</span>
+                    {workspaceFiles.slice(0, 6).map((file) => (
+                      <button
+                        key={file.name}
+                        type="button"
+                        onClick={() => handleOpenWorkspaceFile(file.name)}
+                        className="max-w-[140px] truncate rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        title={file.name}
+                      >
+                        {file.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               </div>
 
               {/* Agent preview panel (collapsed by default) */}
