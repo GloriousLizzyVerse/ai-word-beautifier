@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check, History, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check, History, Trash2, ChevronLeft, ChevronRight, FolderOpen, MessageSquare, PanelRightOpen, PanelRightClose, FileDown, Send } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ThemeToggle from '@/components/theme-toggle';
 import { useResolvedTheme } from '@/lib/use-theme';
+import { isDesktopApp, getDesktopApi, saveDocToWorkspace, folderName, type WorkspaceDoc } from '@/lib/desktop';
 import Markdown from 'markdown-to-jsx';
 import Link from 'next/link';
 
@@ -249,6 +250,20 @@ export default function Home() {
   const [historyError, setHistoryError] = useState('');
   const [historyConfirm, setHistoryConfirm] = useState<{ type: 'restore' | 'delete'; id: string; title: string } | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+
+  // Desktop-client only features (working directory + agent chat)
+  const [isDesktopClient, setIsDesktopClient] = useState(false);
+  const [workingDir, setWorkingDir] = useState('');
+  const [appMode, setAppMode] = useState<'doc' | 'agent'>('doc');
+  const [agentInput, setAgentInput] = useState('');
+  const [agentMessages, setAgentMessages] = useState<{ role: 'user' | 'assistant'; content: string; savedPath?: string }[]>([]);
+  const [showAgentPreview, setShowAgentPreview] = useState(false);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceDoc[]>([]);
+  const [desktopNotice, setDesktopNotice] = useState('');
+
+  useEffect(() => {
+    setIsDesktopClient(isDesktopApp());
+  }, []);
 
   useEffect(() => {
     const updateOnlineStatus = () => setIsOffline(!navigator.onLine);
@@ -596,6 +611,8 @@ export default function Home() {
       { value: 'Average', label: 'Average' },
       { value: 'Poor', label: 'Poor' },
     ];
+
+  const agentActive = isDesktopClient && appMode === 'agent' && Boolean(workingDir);
 
   const diagramModeOptions = locale === 'zh'
     ? DIAGRAM_MODES
@@ -982,6 +999,10 @@ export default function Home() {
       const finalText = fullTextRef.current;
       if (finalText.trim()) {
         void saveHistoryEntry(finalText);
+        // 桌面端且已选择工作目录时，直接在工作目录生成 .docx
+        if (isDesktopClient && workingDir) {
+          void saveCurrentDocToWorkspace(undefined, finalText);
+        }
       }
 
     } catch (err) {
@@ -1056,6 +1077,51 @@ export default function Home() {
       uploadedImages.length > 0 ? text('analyzingImages') : text('analyzingText'),
       text('generatingText')
     );
+  };
+
+  const handleAgentSend = async () => {
+    const instruction = agentInput.trim();
+    if (!instruction || isFetching || isTyping) return;
+    if (!accountStatusLoaded) return;
+    if (!accountEmail) {
+      setError(locale === 'zh' ? '请先登录账号，再使用对话生成。' : 'Please sign in first.');
+      return;
+    }
+
+    setAgentMessages(prev => [...prev, { role: 'user', content: instruction }]);
+    setAgentInput('');
+
+    const payload = {
+      prompt: instruction,
+      content,
+      model,
+      locale,
+      wordCount,
+      writingStyle,
+      eduLevel,
+      perfLevel,
+      addTypos,
+      humanTrace,
+      enableEvidenceSupport,
+      diagramMode,
+      enableSignatureDate,
+      authorName,
+      documentDate,
+      images: uploadedImages.map(img => ({ id: img.id, base64: img.base64 })),
+    };
+
+    await executeGenerate(payload, text('analyzingText'), text('generatingText'));
+
+    const result = fullTextRef.current;
+    if (!result.trim()) return;
+    const saved = isDesktopClient && workingDir
+      ? await saveCurrentDocToWorkspace(undefined, result)
+      : { ok: false, path: undefined };
+    setAgentMessages(prev => [...prev, {
+      role: 'assistant',
+      content: result,
+      savedPath: saved.ok ? saved.path : undefined,
+    }]);
   };
 
   const handleRefine = async (customPrompt?: string) => {
@@ -1318,6 +1384,123 @@ export default function Home() {
     return result;
   };
 
+  const refreshWorkspace = async (dir: string) => {
+    const api = getDesktopApi();
+    if (!api || !dir) { setWorkspaceFiles([]); return; }
+    try {
+      setWorkspaceFiles(await api.listDocs(dir));
+    } catch {
+      setWorkspaceFiles([]);
+    }
+  };
+
+  const handlePickWorkingDir = async () => {
+    const api = getDesktopApi();
+    if (!api) return;
+    const dir = await api.pickFolder();
+    if (!dir) return;
+    setWorkingDir(dir);
+    setDesktopNotice('');
+    await refreshWorkspace(dir);
+  };
+
+  const handlePickLocalFile = async () => {
+    const api = getDesktopApi();
+    if (!api) return;
+    setError(null);
+    const picked = await api.pickFile();
+    if (!picked) return;
+    try {
+      setIsUploading(true);
+      if (/\.(docx?)$/i.test(picked.ext)) {
+        const mammoth = await getMammoth();
+        const result = await mammoth.extractRawText({ arrayBuffer: picked.bytes?.buffer ?? new ArrayBuffer(0) });
+        setContent(result.value);
+      } else {
+        setContent(picked.text || '');
+      }
+      setIsContentOpen(true);
+    } catch (err) {
+      const e = err as Error;
+      setError(text('errorReadDocx') + e.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleOpenWorkspaceFile = async (name: string) => {
+    const api = getDesktopApi();
+    if (!api || !workingDir) return;
+    await api.showInFolder(`${workingDir}\\${name}`);
+  };
+
+  /** Saves the currently generated document straight into the desktop working directory. */
+  const saveCurrentDocToWorkspace = async (explicitName?: string, markdownOverride?: string) => {
+    if (!isDesktopClient || !workingDir) return { ok: false as const, path: undefined as string | undefined, error: 'no_workspace' };
+    try {
+      const { blob, fileName } = await requestDocx(markdownOverride);
+      const result = await saveDocToWorkspace(workingDir, explicitName || fileName, blob);
+      if (result.ok) {
+        setDesktopNotice(locale === 'zh' ? `已保存到工作目录：${result.path?.split(/[\\/]/).pop() || fileName}` : `Saved to workspace: ${result.path?.split(/[\\/]/).pop() || fileName}`);
+        await refreshWorkspace(workingDir);
+      } else {
+        setDesktopNotice(locale === 'zh' ? `保存失败：${result.error || '未知错误'}` : `Save failed: ${result.error || 'unknown error'}`);
+      }
+      return { ok: Boolean(result.ok), path: result.path, error: result.error };
+    } catch (err) {
+      const e = err as Error;
+      if (e.message !== 'AUTH_REQUIRED') {
+        setDesktopNotice(locale === 'zh' ? '保存失败，请检查网络后重试。' : 'Save failed. Please retry.');
+      }
+      return { ok: false, path: undefined, error: e.message };
+    }
+  };
+
+  const requestDocx = async (markdownOverride?: string): Promise<{ blob: Blob; fileName: string }> => {
+    const sourceMarkdown = markdownOverride || cleanMarkdown;
+    if (!sourceMarkdown) throw new Error(text('errorDownload'));
+    let markdownForDownload = normalizeSignatureBlockForDownload(sourceMarkdown);
+    markdownForDownload = await convertMermaidBlocksToImages(markdownForDownload);
+    const response = await fetch('/api/download', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        markdown: markdownForDownload,
+        images: uploadedImages.map(img => ({ id: img.id, base64: img.base64 }))
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({})) as { code?: string };
+        if (errorData.code === 'AUTH_REQUIRED') {
+          setRequiresLogin(true);
+          throw new Error('AUTH_REQUIRED');
+        }
+      }
+      throw new Error(text('errorDownload'));
+    }
+
+    const blob = await response.blob();
+    const serverFileName = getFileNameFromDisposition(response.headers.get('content-disposition'));
+    const fallbackFileName = `${sanitizeFileName(extractTitleFromMarkdown(markdownForDownload))}.docx`;
+    const finalFileName = sanitizeFileName((serverFileName || fallbackFileName).replace(/\.docx$/i, '')) + '.docx';
+    return { blob, fileName: finalFileName };
+  };
+
+  const downloadDocxToBrowser = async ({ blob, fileName }: { blob: Blob; fileName: string }) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
   const handleDownload = async () => {
     if (!cleanMarkdown) return;
     setIsDownloading(true);
@@ -1325,45 +1508,12 @@ export default function Home() {
     setRequiresLogin(false);
 
     try {
-      {
-        let markdownForDownload = normalizeSignatureBlockForDownload(cleanMarkdown);
-        markdownForDownload = await convertMermaidBlocksToImages(markdownForDownload);
-        const response = await fetch('/api/download', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            markdown: markdownForDownload,
-            images: uploadedImages.map(img => ({ id: img.id, base64: img.base64 }))
-          }),
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            const errorData = await response.json().catch(() => ({})) as { code?: string };
-            if (errorData.code === 'AUTH_REQUIRED') {
-              setRequiresLogin(true);
-              throw new Error('AUTH_REQUIRED');
-            }
-          }
-          throw new Error(text('errorDownload'));
-        }
-
-        const blob = await response.blob();
-        const serverFileName = getFileNameFromDisposition(response.headers.get('content-disposition'));
-        const fallbackFileName = `${sanitizeFileName(extractTitleFromMarkdown(markdownForDownload))}.docx`;
-        const finalFileName = sanitizeFileName((serverFileName || fallbackFileName).replace(/\.docx$/i, '')) + '.docx';
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = finalFileName;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+      const docx = await requestDocx();
+      if (isDesktopClient && workingDir) {
+        await saveCurrentDocToWorkspace(docx.fileName);
+      } else {
+        await downloadDocxToBrowser(docx);
       }
-
       setSuccess(true);
     } catch (err) {
       console.error('Download Error:', err);
@@ -1442,6 +1592,47 @@ export default function Home() {
             <h1 className="text-base font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap truncate sm:text-xl">{text('appTitle')}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {isDesktopClient && (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePickWorkingDir}
+                  title={workingDir || (locale === 'zh' ? '选择工作目录' : 'Choose working folder')}
+                  className="flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors max-w-[220px]"
+                >
+                  <FolderOpen className="w-4 h-4 shrink-0" />
+                  <span className="truncate">
+                    {workingDir ? folderName(workingDir) : (locale === 'zh' ? '选择工作目录' : 'Workspace')}
+                  </span>
+                </button>
+                {workingDir && (
+                  <div className="hidden md:flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setAppMode('doc')}
+                      className={cn(
+                        'px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
+                        appMode === 'doc' ? 'bg-white dark:bg-gray-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                      )}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      {locale === 'zh' ? '文档' : 'Doc'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAppMode('agent')}
+                      className={cn(
+                        'px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
+                        appMode === 'agent' ? 'bg-white dark:bg-gray-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                      )}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      {locale === 'zh' ? '对话' : 'Chat'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
             <AccountControls locale={locale} email={accountEmail} onLogout={() => setAccountEmail('')} />
             {accountEmail && (
               <button
@@ -1535,6 +1726,162 @@ export default function Home() {
             </div>
           </div>
 
+          {agentActive ? (
+            <div className="flex-1 min-h-0 flex gap-4">
+              {/* Agent chat panel */}
+              <div className="flex-1 min-w-0 flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                  <div className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                    <MessageSquare className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+                    <h2 className="font-semibold">{locale === 'zh' ? '对话生成' : 'Chat to generate'}</h2>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[180px]">{workingDir}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAgentPreview(!showAgentPreview)}
+                    className="flex items-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    {showAgentPreview ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                    {showAgentPreview ? (locale === 'zh' ? '收起预览' : 'Hide preview') : (locale === 'zh' ? '展开预览' : 'Show preview')}
+                  </button>
+                </div>
+
+                <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar p-4 space-y-4">
+                  {agentMessages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 dark:text-gray-500 gap-2">
+                      <MessageSquare className="w-8 h-8" />
+                      <p className="text-sm">{locale === 'zh' ? '用一句话描述你要整理的文稿，剩下的交给对话。' : 'Describe the document you need in one sentence.'}</p>
+                      <p className="text-xs">{locale === 'zh' ? '生成结果会自动保存到当前工作目录。' : 'Results are saved to the current working folder automatically.'}</p>
+                    </div>
+                  ) : (
+                    agentMessages.map((msg, index) => (
+                      <div key={index} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                        <div className={cn(
+                          'max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words',
+                          msg.role === 'user'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                        )}>
+                          {msg.role === 'assistant' ? (
+                            <>
+                              <p className="line-clamp-6">{msg.content}</p>
+                              {msg.savedPath ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenWorkspaceFile(msg.savedPath!.split(/[\\/]/).pop() || '')}
+                                  className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                                >
+                                  <FileDown className="w-3.5 h-3.5" />
+                                  {msg.savedPath.split(/[\\/]/).pop()}
+                                </button>
+                              ) : (
+                                <span className="mt-2 block text-xs text-gray-400 dark:text-gray-500">
+                                  {locale === 'zh' ? '（未选择工作目录，未自动保存）' : '(No workspace selected, not saved)'}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            msg.content
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {(isFetching || isTyping) && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-xl px-3.5 py-2.5 text-sm flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {statusMsg || text('generatingDefault')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 border-t border-gray-100 dark:border-gray-800 shrink-0">
+                  {desktopNotice && (
+                    <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400 truncate">{desktopNotice}</p>
+                  )}
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={agentInput}
+                      onChange={(e) => setAgentInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
+                      placeholder={locale === 'zh' ? '描述你要整理的文稿，Enter 发送，Shift+Enter 换行' : 'Describe the document, Enter to send'}
+                      rows={2}
+                      className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAgentSend}
+                      disabled={isFetching || isTyping || !agentInput.trim()}
+                      className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white px-4 py-2.5 text-sm font-medium transition-colors"
+                    >
+                      {isFetching || isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      {locale === 'zh' ? '发送' : 'Send'}
+                    </button>
+                  </div>
+                  {workspaceFiles.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{locale === 'zh' ? '工作目录文件' : 'Workspace files'}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {workspaceFiles.slice(0, 8).map((file) => (
+                          <button
+                            key={file.name}
+                            type="button"
+                            onClick={() => handleOpenWorkspaceFile(file.name)}
+                            className="max-w-[160px] truncate rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title={file.name}
+                          >
+                            {file.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Agent preview panel (collapsed by default) */}
+              {showAgentPreview && (
+                <div className="hidden lg:flex w-[45%] flex-col bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{locale === 'zh' ? '预览' : 'Preview'}</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(true)}
+                      className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      title={locale === 'zh' ? '全屏查看' : 'Fullscreen'}
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div
+                    ref={resultRef}
+                    onScroll={handleScroll}
+                    className="p-4 overflow-y-auto flex-1 text-sm prose prose-sm prose-indigo dark:prose-invert max-w-none hide-scrollbar"
+                  >
+                    {displayedMarkdown ? (
+                      <Markdown options={{ overrides: createMarkdownOverrides('max-h-64') }}>
+                        {cleanMarkdown}
+                      </Markdown>
+                    ) : (
+                      <p className="text-gray-400 dark:text-gray-500 text-xs">{locale === 'zh' ? '还没有生成内容' : 'Nothing generated yet'}</p>
+                    )}
+                  </div>
+                  <div className="p-3 border-t border-gray-100 dark:border-gray-800 shrink-0 flex gap-2">
+                    <button
+                      onClick={handleDownload}
+                      disabled={isDownloading || !displayedMarkdown}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-3 py-2 text-xs font-medium transition-colors"
+                    >
+                      {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                      {workingDir ? (locale === 'zh' ? '存入工作目录' : 'Save to workspace') : text('downloadButton')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6">
           {/* Left Column: Advanced Settings */}
           <div className="w-full lg:w-[25%] lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-2 hide-scrollbar">
@@ -1712,13 +2059,16 @@ export default function Home() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        fileInputRef.current?.click();
+                        if (isDesktopClient) void handlePickLocalFile();
+                        else fileInputRef.current?.click();
                       }}
                       disabled={isUploading}
                       className="text-xs flex items-center gap-1 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-800/60 px-3 py-1.5 rounded-md transition-colors"
                     >
                       {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                      {locale === 'zh' ? '上传 Word 提取文字' : 'Upload .docx'}
+                      {isDesktopClient
+                        ? (locale === 'zh' ? '选择本地文件' : 'Choose local file')
+                        : (locale === 'zh' ? '上传 Word 提取文字' : 'Upload .docx')}
                     </button>
                   </div>
                 </div>
@@ -2001,6 +2351,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+        )}
         </div>
       </main>
 

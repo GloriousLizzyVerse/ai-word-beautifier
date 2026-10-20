@@ -1,6 +1,6 @@
-const { app, BrowserWindow, Menu, shell, net } = require('electron');
-const { readFileSync } = require('node:fs');
-const { join } = require('node:path');
+const { app, BrowserWindow, Menu, shell, net, ipcMain, dialog } = require('electron');
+const { readFileSync, writeFileSync, readdirSync, statSync } = require('node:fs');
+const { join, basename, extname, isAbsolute, normalize } = require('node:path');
 
 const APP_NAME = 'word助手';
 const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
@@ -80,6 +80,73 @@ function showOfflinePage(reason) {
   mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(offlinePageHtml(reason))}`);
 }
 
+const DOC_EXTENSIONS = ['.docx', '.doc', '.txt', '.md', '.markdown'];
+
+function registerDesktopIpc() {
+  ipcMain.handle('desktop:pickFolder', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle('desktop:pickFile', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: '文档', extensions: DOC_EXTENSIONS.map((ext) => ext.slice(1)) }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const filePath = result.filePaths[0];
+    const ext = extname(filePath).toLowerCase();
+    if (ext === '.docx') {
+      // docx needs mammoth in the renderer, so hand over raw bytes.
+      return { filePath, name: basename(filePath), ext, bytes: new Uint8Array(readFileSync(filePath)) };
+    }
+    return { filePath, name: basename(filePath), ext, text: readFileSync(filePath, 'utf8') };
+  });
+
+  ipcMain.handle('desktop:saveDoc', async (_event, dir, fileName, data) => {
+    if (typeof dir !== 'string' || !dir || typeof fileName !== 'string' || !fileName) {
+      return { ok: false, error: '参数无效' };
+    }
+    // Keep writes inside the chosen working directory.
+    const safeName = fileName.replace(/[\\/:*?"<>|\u0000-\u001F]/g, '').trim();
+    if (!safeName) return { ok: false, error: '文件名无效' };
+    const targetDir = isAbsolute(dir) ? normalize(dir) : dir;
+    const target = join(targetDir, safeName);
+    if (!target.startsWith(targetDir) || !isAbsolute(target)) {
+      return { ok: false, error: '目标路径不在工作目录内' };
+    }
+    try {
+      writeFileSync(target, Buffer.from(data instanceof Uint8Array ? data : Buffer.from(String(data))));
+      return { ok: true, path: target };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : '写入失败' };
+    }
+  });
+
+  ipcMain.handle('desktop:listDocs', async (_event, dir) => {
+    if (typeof dir !== 'string' || !dir) return [];
+    try {
+      return readdirSync(dir)
+        .filter((name) => DOC_EXTENSIONS.includes(extname(name).toLowerCase()))
+        .map((name) => {
+          const info = statSync(join(dir, name));
+          return { name, size: info.size, mtime: info.mtime.toISOString() };
+        })
+        .sort((a, b) => (a.mtime < b.mtime ? 1 : -1))
+        .slice(0, 50);
+    } catch {
+      return [];
+    }
+  });
+
+  ipcMain.handle('desktop:showInFolder', async (_event, filePath) => {
+    if (typeof filePath !== 'string' || !filePath) return false;
+    shell.showItemInFolder(filePath);
+    return true;
+  });
+}
+
 function startOfflineWatch() {
   if (offlineWatchTimer) return;
   offlineWatchTimer = setInterval(() => {
@@ -106,7 +173,9 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       spellcheck: false,
+      preload: join(__dirname, 'preload.js'),
     },
   });
 
@@ -156,6 +225,7 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+  registerDesktopIpc();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
