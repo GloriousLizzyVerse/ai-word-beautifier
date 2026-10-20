@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check } from 'lucide-react';
+import { Download, Loader2, FileText, Settings, Wand2, AlertCircle, Upload, ImagePlus, X, ChevronDown, ChevronUp, Maximize2, Minimize2, SlidersHorizontal, Copy, Check, History, RotateCcw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ThemeToggle from '@/components/theme-toggle';
@@ -15,6 +15,14 @@ function cn(...inputs: ClassValue[]) {
 }
 
 type Locale = 'en' | 'zh';
+
+type HistoryItem = {
+  id: string;
+  title: string;
+  snippet: string;
+  wordCount: number;
+  createdAt: string;
+};
 
 const LOCALE_STORAGE_KEY = '__app_locale__';
 const PENDING_GENERATION_DRAFT_KEY = '__pending_generation_draft__';
@@ -233,6 +241,13 @@ export default function Home() {
   const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+
   useEffect(() => {
     setLocale(resolveInitialLocale());
   }, []);
@@ -284,6 +299,81 @@ export default function Home() {
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy text:', err);
+    }
+  };
+
+  const HISTORY_PAGE_SIZE = 10;
+
+  const countContentWords = (value: string) => value.replace(/\s/g, '').length;
+
+  const saveHistoryEntry = async (markdown: string) => {
+    if (!markdown.trim()) return;
+    try {
+      await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: extractTitleFromMarkdown(markdown),
+          content: markdown,
+          locale,
+          wordCount: countContentWords(markdown),
+        }),
+      });
+    } catch {
+      // 历史保存失败不影响生成结果
+    }
+  };
+
+  const loadHistory = async (page: number) => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await fetch(`/api/history?page=${page}`, { cache: 'no-store' });
+      const data = await response.json() as { items?: HistoryItem[]; total?: number; page?: number; error?: string };
+      if (!response.ok) throw new Error(data.error || 'load_failed');
+      setHistoryItems(data.items || []);
+      setHistoryTotal(data.total || 0);
+      setHistoryPage(data.page || page);
+    } catch {
+      setHistoryError(locale === 'zh' ? '历史记录加载失败，请重试。' : 'Failed to load history. Please retry.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openHistory = () => {
+    setIsHistoryOpen(true);
+    void loadHistory(1);
+  };
+
+  const handleDeleteHistory = async (id: string) => {
+    if (!window.confirm(locale === 'zh' ? '确定删除这条历史记录吗？' : 'Delete this history entry?')) return;
+    try {
+      const response = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('delete_failed');
+      const remaining = historyItems.length - 1;
+      const nextPage = remaining === 0 && historyPage > 1 ? historyPage - 1 : historyPage;
+      await loadHistory(nextPage);
+    } catch {
+      setHistoryError(locale === 'zh' ? '删除失败，请重试。' : 'Failed to delete. Please retry.');
+    }
+  };
+
+  const handleRestoreHistory = async (id: string) => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await fetch(`/api/history/${id}`, { cache: 'no-store' });
+      const data = await response.json() as { item?: { content?: string }; error?: string };
+      if (!response.ok || typeof data.item?.content !== 'string') throw new Error(data.error || 'load_failed');
+      fullTextRef.current = data.item.content;
+      setDisplayedMarkdown(data.item.content);
+      setError(null);
+      setIsHistoryOpen(false);
+    } catch {
+      setHistoryError(locale === 'zh' ? '恢复失败，请重试。' : 'Failed to restore. Please retry.');
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -874,6 +964,12 @@ export default function Home() {
         fullTextRef.current += trailingText;
       }
 
+      // 生成完成后自动保存到历史记录（失败不影响生成结果）
+      const finalText = fullTextRef.current;
+      if (finalText.trim()) {
+        void saveHistoryEntry(finalText);
+      }
+
     } catch (err) {
       console.error('Generation Error:', err);
       const e = err as Error;
@@ -1333,6 +1429,17 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <AccountControls locale={locale} email={accountEmail} onLogout={() => setAccountEmail('')} />
+            {accountEmail && (
+              <button
+                type="button"
+                onClick={openHistory}
+                title={locale === 'zh' ? '查看历史生成记录' : 'View generation history'}
+                className="flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <History className="w-4 h-4" />
+                <span className="hidden sm:inline">{locale === 'zh' ? '历史' : 'History'}</span>
+              </button>
+            )}
             <ThemeToggle locale={locale} />
             <div className="hidden md:flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
               <button
@@ -1885,6 +1992,97 @@ export default function Home() {
         </div>
       </footer>
 
+      {/* Generation History Modal */}
+      {isHistoryOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-lg">{locale === 'zh' ? '历史生成记录' : 'Generation history'}</h3>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1 custom-scrollbar">
+              {historyError && (
+                <p className="mb-3 rounded-md bg-red-50 dark:bg-red-900/30 px-3 py-2 text-xs text-red-600 dark:text-red-400">{historyError}</p>
+              )}
+              {historyLoading ? (
+                <div className="py-12 flex items-center justify-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {locale === 'zh' ? '加载中...' : 'Loading...'}
+                </div>
+              ) : historyItems.length === 0 ? (
+                <div className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+                  {locale === 'zh' ? '暂无历史记录，生成后会自动保存到这里。' : 'No history yet. Generated documents are saved here automatically.'}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyItems.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{item.title}</p>
+                          <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                            {new Date(item.createdAt).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {' · '}
+                            {locale === 'zh' ? `约 ${item.wordCount} 字` : `~${item.wordCount} words`}
+                          </p>
+                          {item.snippet && (
+                            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 whitespace-pre-wrap break-words">{item.snippet}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleRestoreHistory(item.id)}
+                            title={locale === 'zh' ? '恢复到预览区' : 'Restore to preview'}
+                            className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteHistory(item.id)}
+                            title={locale === 'zh' ? '删除' : 'Delete'}
+                            className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {historyTotal > HISTORY_PAGE_SIZE && (
+              <div className="flex items-center justify-between p-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <button
+                  onClick={() => loadHistory(historyPage - 1)}
+                  disabled={historyPage <= 1 || historyLoading}
+                  className="flex items-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  {locale === 'zh' ? '上一页' : 'Prev'}
+                </button>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {locale === 'zh' ? `第 ${historyPage} / ${Math.ceil(historyTotal / HISTORY_PAGE_SIZE)} 页（共 ${historyTotal} 条）` : `Page ${historyPage} of ${Math.ceil(historyTotal / HISTORY_PAGE_SIZE)} (${historyTotal} items)`}
+                </span>
+                <button
+                  onClick={() => loadHistory(historyPage + 1)}
+                  disabled={historyPage >= Math.ceil(historyTotal / HISTORY_PAGE_SIZE) || historyLoading}
+                  className="flex items-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {locale === 'zh' ? '下一页' : 'Next'}
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Privacy Policy Modal */}
       {isPrivacyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -1902,7 +2100,7 @@ export default function Home() {
               {locale === 'zh' ? (
                 <>
                   <h4>1. 数据收集与流转</h4>
-                  <p>注册和验证邮箱时，我们会处理您的邮箱地址、邮箱验证码及其有效期，并保存密码派生摘要（不保存明文密码）、账号创建/最近登录时间和服务端会话摘要；登录状态由 HttpOnly Cookie 维持。生成和下载功能仅向已登录用户开放，相关请求会关联账号，用于统计请求类型、结果、时间、输入长度、图片使用情况及错误摘要。为估算访问量和独立访客，我们会记录访问 IP 地址及浏览器 User-Agent；登录相关限频使用由 IP 派生的摘要标识。本应用业务数据库不保存您提交的提示词、文档正文或图片原始内容。账号、会话和必要的统计数据存储在本服务配置的数据库（Cloudflare D1 或 MySQL）中。</p>
+                  <p>注册和验证邮箱时，我们会处理您的邮箱地址、邮箱验证码及其有效期，并保存密码派生摘要（不保存明文密码）、账号创建/最近登录时间和服务端会话摘要；登录状态由 HttpOnly Cookie 维持。生成和下载功能仅向已登录用户开放，相关请求会关联账号，用于统计请求类型、结果、时间、输入长度、图片使用情况及错误摘要。为估算访问量和独立访客，我们会记录访问 IP 地址及浏览器 User-Agent；登录相关限频使用由 IP 派生的摘要标识。本应用业务数据库不保存您提交的提示词、文档正文或图片原始内容；但为提供历史记录功能，您成功生成的文档内容会自动保存至您的账号历史记录（每账号最多保留最近 100 条，可在页面「历史」中查看或删除）。账号、会话、必要的统计数据及历史记录存储在本服务配置的数据库（Cloudflare D1 或 MySQL）中。</p>
                   <h4>2. 上游数据安全与隐私边界</h4>
                   <p>为提供服务，您提交的提示词、文档内容及图片会通过 HTTPS 发送给 DeepSeek（模型：deepseek-flash）处理；验证邮箱和重置密码所需的邮箱地址及邮件内容会交由配置的邮件服务商发送；本服务运行及数据库由 Cloudflare 或配置的 MySQL 服务提供基础设施支持。各服务商对其所处理数据的保存和使用受其自身政策约束，本平台无法控制或代其作出承诺。请勿提交国家秘密、商业秘密、账号凭证或不必要的敏感个人信息。</p>
                   <h4>3. 模型训练声明</h4>
@@ -1913,7 +2111,7 @@ export default function Home() {
               ) : (
                 <>
                   <h4>1. Data flow</h4>
-                  <p>For registration and email verification, we process your email address and verification code (including its expiry), and store a derived password hash (not your plaintext password), account timestamps, and a server-side session hash; an HttpOnly cookie maintains your signed-in state. Generation and download are available only to signed-in users. Related requests are associated with your account for usage analytics (request type, result, time, input length, image usage, and error summary). We record visitor IP addresses and browser User-Agent values to estimate visits and unique visitors; sign-in rate limiting uses a derived IP identifier. The application database does not store submitted prompts, document text, or original image contents. Account, session, and necessary analytics data are stored in the configured database (Cloudflare D1 or MySQL).</p>
+                  <p>For registration and email verification, we process your email address and verification code (including its expiry), and store a derived password hash (not your plaintext password), account timestamps, and a server-side session hash; an HttpOnly cookie maintains your signed-in state. Generation and download are available only to signed-in users. Related requests are associated with your account for usage analytics (request type, result, time, input length, image usage, and error summary). We record visitor IP addresses and browser User-Agent values to estimate visits and unique visitors; sign-in rate limiting uses a derived IP identifier. The application database does not store submitted prompts, document text, or original image contents; however, to provide the history feature, each successfully generated document is saved to your per-account history (up to the most recent 100 entries, viewable and deletable from the History panel). Account, session, and necessary analytics data, along with generation history, are stored in the configured database (Cloudflare D1 or MySQL).</p>
                   <h4>2. Third-party processing</h4>
                   <p>Your prompts, document content, and images are sent over HTTPS to DeepSeek (model: deepseek-flash) for processing. Email addresses and message content needed for verification and password resets are sent through the configured email provider. Cloudflare or the configured MySQL provider supplies the service infrastructure and database. Each provider processes data under its own policies; this site cannot control or make promises on their behalf. Do not submit state secrets, trade secrets, credentials, or unnecessary sensitive personal information.</p>
                   <h4>3. Model training</h4>

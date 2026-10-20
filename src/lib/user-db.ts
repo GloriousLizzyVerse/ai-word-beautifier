@@ -77,7 +77,7 @@ function getMySqlPool() {
   return mysqlPool;
 }
 
-async function getUserDatabase(): Promise<UserDatabase> {
+export async function getUserDatabase(): Promise<UserDatabase> {
   let cloudflareDb: D1Database | undefined;
   try {
     const context = await getCloudflareContext({ async: true });
