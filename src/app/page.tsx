@@ -412,6 +412,7 @@ export default function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const agentImageRef = useRef<HTMLInputElement>(null);
   const [isContentOpen, setIsContentOpen] = useState(false);
   const [wordCount, setWordCount] = useState('');
   const [writingStyle, setWritingStyle] = useState('');
@@ -2079,7 +2080,26 @@ export default function Home() {
                   {desktopNotice && (
                     <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400 truncate">{desktopNotice}</p>
                   )}
-                  {/* 图片缩略图：不新增按钮，上传走聊天框粘贴，标注/副本/删除复用与文档模式相同的按钮 */}
+                  {/* 图片上传：单个按钮通吃普通文档与教学文档（一按钮多用）；标注在发送/对话开始后按需求读取 */}
+                  <div className="mb-2 flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => agentImageRef.current?.click()}
+                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <ImagePlus className="w-3.5 h-3.5" />
+                      {locale === 'zh' ? `上传图片（${uploadedImages.length}/${MAX_IMAGE_COUNT}）` : `Images (${uploadedImages.length}/${MAX_IMAGE_COUNT})`}
+                    </button>
+                    <input
+                      type="file"
+                      ref={agentImageRef}
+                      accept="image/*"
+                      multiple
+                      onChange={async (e) => { await handleImageFiles(Array.from(e.target.files || [])); if (agentImageRef.current) agentImageRef.current.value = ''; }}
+                      className="hidden"
+                    />
+                  </div>
+                  {/* 图片缩略图：标注/副本/删除复用与文档模式相同的按钮 */}
                   {uploadedImages.length > 0 && (
                     <div className="mb-2 flex gap-2 overflow-x-auto hide-scrollbar pb-1">
                       {uploadedImages.map((img) => (
