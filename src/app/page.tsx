@@ -98,7 +98,7 @@ function AccountControls({ locale, email, onLogout }: { locale: 'zh' | 'en'; ema
 
   return email ? (
     <div className="flex items-center gap-2 text-xs sm:text-sm">
-      <span className="max-w-28 truncate text-gray-600 dark:text-gray-400 sm:max-w-48">{email}</span>
+      <span className="max-w-20 truncate text-xs text-gray-600 dark:text-gray-400 sm:max-w-48 sm:text-sm">{email}</span>
       <button type="button" onClick={logout} className="rounded-md border border-gray-200 dark:border-gray-700 px-2 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
         {locale === 'zh' ? '退出' : 'Log out'}
       </button>
@@ -1419,13 +1419,13 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen bg-gray-50/50 dark:bg-gray-950 flex flex-col overflow-hidden">
+    <div className="min-h-screen lg:h-screen bg-gray-50/50 dark:bg-gray-950 flex flex-col lg:overflow-hidden">
       {/* Header */}
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shrink-0 z-10">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
-            <Wand2 className="w-6 h-6" />
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{text('appTitle')}</h1>
+          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 min-w-0">
+            <Wand2 className="w-5 h-5 shrink-0 sm:w-6 sm:h-6" />
+            <h1 className="text-base font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap truncate sm:text-xl">{text('appTitle')}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <AccountControls locale={locale} email={accountEmail} onLogout={() => setAccountEmail('')} />
@@ -1468,8 +1468,8 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 py-6 h-full flex flex-col gap-4">
+      <main className="flex-1 lg:min-h-0 lg:overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 py-6 lg:h-full flex flex-col gap-4">
           <div className="shrink-0">
             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5">
               <details className="group">
@@ -1981,8 +1981,8 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shrink-0 py-4">
-        <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500 dark:text-gray-400 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
+      <footer className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shrink-0 py-3 sm:py-4">
+        <div className="max-w-7xl mx-auto px-4 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-6">
           <p>{text('footerBrand')}</p>
           <p className="hidden sm:block">|</p>
           <a
