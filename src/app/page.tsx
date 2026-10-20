@@ -1021,14 +1021,18 @@ export default function Home() {
       img.src = base64;
     });
 
-  const runAnnotation = async (id: string, base64: string) => {
+  // 把用户当前的「排版生成要求」(原始内容 + 指令) 拼成标注上下文
+  const buildAnnotContext = () => [content, prompt].filter(Boolean).join('\n').slice(0, 1000);
+
+  // 标注某张原图：带上需求上下文，绘制后写回；返回标注后的 base64（失败返回 undefined）
+  const runAnnotation = async (id: string, base64: string, context?: string): Promise<string | undefined> => {
     setAnnotatingIds(prev => Array.from(new Set([...prev, id])));
     try {
       const res = await fetch('/api/annotate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ image: { id, base64 }, locale }),
+        body: JSON.stringify({ image: { id, base64 }, locale, context: context || '' }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -1049,6 +1053,7 @@ export default function Home() {
           patch.base64 = await drawAnnotations(base64, annotations);
         }
         setUploadedImages(prev => prev.map(im => (im.id === id ? { ...im, ...patch } : im)));
+        return annotations.length ? patch.base64 : undefined;
       } else if (res.status === 401) {
         setError(locale === 'zh' ? '请先登录后使用图片标注。' : 'Sign in to use image annotation.');
       }
@@ -1057,10 +1062,11 @@ export default function Home() {
     } finally {
       setAnnotatingIds(prev => prev.filter(x => x !== id));
     }
+    return undefined;
   };
 
   // 一图多用：基于同一张原图再生成一份新的标注副本（不覆盖已有副本）
-  const handleReannotate = (img: { id: string; base64: string; origBase64: string; file: File }) => {
+  const handleReannotate = (img: { id: string; base64: string; origBase64: string; file: File }, context?: string) => {
     if (uploadedImages.length >= MAX_IMAGE_COUNT) {
       setError(locale === 'zh' ? `最多上传 ${MAX_IMAGE_COUNT} 张图片。` : `You can upload up to ${MAX_IMAGE_COUNT} images.`);
       return;
@@ -1098,11 +1104,8 @@ export default function Home() {
           ? await convertGifToPngDataUrl(file)
           : await readFileAsDataUrl(file);
         const id = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        setUploadedImages(prev => [...prev, { id, base64, origBase64: base64, file, variant: 1 }]);
-
-        if (teachingDocMode) {
-          await runAnnotation(id, base64);
-        }
+        // 仅存原图，不立即标注——等用户输入需求后，点「标注」或生成时再按需求上下文标注
+        setUploadedImages(prev => [...prev, { id, base64, origBase64: base64, file, variant: 1, annotated: false }]);
       } catch {
         setError(locale === 'zh' ? `图片处理失败：${file.name}` : `Failed to process image: ${file.name}`);
       }
@@ -1290,6 +1293,21 @@ export default function Home() {
       return;
     }
 
+    // 教学模式下，先按用户需求上下文把尚未标注的图片标注好，再生成文档
+    const resolvedBase64 = new Map<string, string>();
+    if (teachingDocMode) {
+      const ctx = buildAnnotContext();
+      const pending = uploadedImages.filter(im => im.origBase64 && !im.annotated);
+      if (pending.length) {
+        await Promise.all(
+          pending.map(async (im) => {
+            const ab = await runAnnotation(im.id, im.origBase64, ctx);
+            if (ab) resolvedBase64.set(im.id, ab);
+          })
+        );
+      }
+    }
+
     const payload = {
       prompt,
       content,
@@ -1306,7 +1324,12 @@ export default function Home() {
       enableSignatureDate,
       authorName,
       documentDate,
-      images: uploadedImages.map(img => ({ id: img.id, base64: img.base64, caption: img.caption || '', insertHint: img.insertHint || '' })),
+      images: uploadedImages.map(img => ({
+        id: img.id,
+        base64: resolvedBase64.get(img.id) || img.base64,
+        caption: img.caption || '',
+        insertHint: img.insertHint || '',
+      })),
     };
 
     await executeGenerate(
@@ -2355,7 +2378,7 @@ export default function Home() {
                 </div>
                 {teachingDocMode && (
                   <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 p-2 rounded-md flex items-start gap-1">
-                    <span>{locale === 'zh' ? '教学文档模式：图片上传后 AI 会自动挑出 1~2 个关键点做紧凑标注（框选/箭头/椭圆/旁注），再随文档一起导出。' : 'Teaching mode: uploads are auto-annotated with 1~2 key points (box/arrow/ellipse/note), then inserted into the document.'}</span>
+                    <span>{locale === 'zh' ? '教学文档模式：上传图片后不会立即标注。请先在上方输入主题/需求，再点缩略图右下角的魔杖按钮标注，或直接点「生成」——AI 会按你的需求挑 1~2 个关键点做紧凑标注（框选/箭头/椭圆/旁注），可反复标注生成不同副本。' : 'Teaching mode: uploads are not annotated immediately. Enter your topic/requirement above, then click the wand button on a thumbnail or hit Generate — AI marks 1~2 key points per your need (box/arrow/ellipse/note); re-annotate for more copies.'}</span>
                   </div>
                 )}
               </div>
@@ -2387,18 +2410,20 @@ export default function Home() {
                   </button>
                   {teachingDocMode && !annotatingIds.includes(img.id) && (
                     <button
-                      onClick={() => handleReannotate(img)}
-                      title={locale === 'zh' ? '基于原图再次标注（新增一份副本）' : 'Annotate again from the original (new copy)'}
+                      onClick={() => img.annotated ? handleReannotate(img, buildAnnotContext()) : runAnnotation(img.id, img.origBase64, buildAnnotContext())}
+                      title={img.annotated
+                        ? (locale === 'zh' ? '基于原图再次标注（新增一份副本）' : 'Annotate again from the original (new copy)')
+                        : (locale === 'zh' ? '按当前需求标注这张图' : 'Annotate this image using the current requirement')}
                       className="absolute bottom-2 right-2 p-1 bg-white/80 dark:bg-gray-800/80 hover:bg-indigo-100 hover:text-indigo-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <RefreshCw className="w-4 h-4" />
+                      {img.annotated ? <RefreshCw className="w-4 h-4" /> : <Wand2 className="w-4 h-4" />}
                     </button>
                   )}
                   <div
                     className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-2 py-1 truncate"
                     title={img.caption ? `${img.caption}${img.insertHint ? '｜' + img.insertHint : ''}` : undefined}
                   >
-                    {img.annotated ? `已标注 ${img.annotationCount ?? 0} 处` : `ID: ${img.id}`}
+                    {img.annotated ? `已标注 ${img.annotationCount ?? 0} 处` : (teachingDocMode ? (locale === 'zh' ? '未标注·点右下角按钮' : 'Not annotated') : `ID: ${img.id}`)}
                   </div>
                 </div>
               ))}
