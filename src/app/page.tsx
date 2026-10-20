@@ -248,6 +248,18 @@ export default function Home() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [historyConfirm, setHistoryConfirm] = useState<{ type: 'restore' | 'delete'; id: string; title: string } | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOffline(!navigator.onLine);
+    updateOnlineStatus();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   useEffect(() => {
     setLocale(resolveInitialLocale());
@@ -1472,6 +1484,16 @@ export default function Home() {
       {/* Main Content */}
       <main className="flex-1 lg:min-h-0 lg:overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 py-6 lg:h-full flex flex-col gap-4">
+          {isOffline && (
+            <div className="shrink-0 flex items-start sm:items-center gap-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 px-4 py-2.5 text-xs sm:text-sm text-amber-800 dark:text-amber-300">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
+              <span>
+                {locale === 'zh'
+                  ? '当前处于离线状态：AI 生成、下载 .docx、历史记录、账号登录等需要联网的功能暂不可用，网络恢复后自动恢复使用。'
+                  : 'You are offline: AI generation, .docx download, history, and sign-in are unavailable until you reconnect.'}
+              </span>
+            </div>
+          )}
           <div className="shrink-0">
             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5">
               <details className="group">
@@ -1780,7 +1802,7 @@ export default function Home() {
 
               <button
                 onClick={handleGenerate}
-                disabled={isFetching || isTyping || !accountStatusLoaded}
+                disabled={isFetching || isTyping || !accountStatusLoaded || isOffline}
                 className={cn(
                   "w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium text-white transition-all shadow-sm shrink-0",
                   (isFetching || isTyping || !accountStatusLoaded)

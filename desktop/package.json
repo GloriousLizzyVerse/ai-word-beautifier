@@ -1,7 +1,7 @@
 {
   "name": "word-assistant",
   "productName": "word助手",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "AI Word 排版美化助手 桌面客户端",
   "main": "main.js",

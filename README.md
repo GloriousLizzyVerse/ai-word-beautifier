@@ -270,6 +270,8 @@ Cloudflare Worker 请按上一节的 Workers Builds 配置部署，不要使用 
 
 - 客户端加载 `desktop/config.json` 中的 `appUrl`（当前为 `https://word.violet27chen.com/`），修改该地址后重新构建即可。
 - 客户端不内置服务端：生成仍由云端 DeepSeek 接口完成，需要联网；数据库与 API 密钥均不随安装包分发。
+- 离线行为：断网时窗口内显示离线提示页（不会白屏），网络恢复后自动或手动重连即可；应用内同时有离线横幅提示哪些功能暂不可用。
+- 应用图标取自站点头部 logo（魔法棒）；`desktop/build/icon.png` / `icon.ico`。
 
 ### 本地构建
 
