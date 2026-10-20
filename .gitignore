@@ -17,3 +17,7 @@ worker-configuration.d.ts
 
 # Local database files
 .data/
+
+# Desktop app (Electron)
+desktop/node_modules/
+desktop/dist/

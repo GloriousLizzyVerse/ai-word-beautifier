@@ -264,6 +264,32 @@ npm run start
 
 Cloudflare Worker 请按上一节的 Workers Builds 配置部署，不要使用 `npm run start`。
 
+## 桌面客户端（word助手）
+
+`desktop/` 目录包含基于 Electron 的 Windows 桌面客户端：安装后作为独立窗口使用，无需打开浏览器。
+
+- 客户端加载 `desktop/config.json` 中的 `appUrl`（当前为 `https://word.violet27chen.com/`），修改该地址后重新构建即可。
+- 客户端不内置服务端：生成仍由云端 DeepSeek 接口完成，需要联网；数据库与 API 密钥均不随安装包分发。
+
+### 本地构建
+
+```bash
+cd desktop
+npm install
+npm run dist
+# 产物：desktop/dist/word助手 Setup <version>.exe（NSIS 安装包）
+```
+
+如需自定义站点地址，编辑 `desktop/config.json` 的 `appUrl` 后重新执行 `npm run dist`。
+
+### GitHub Actions 自动构建到 Release
+
+`.github/workflows/desktop-release.yml` 已配置自动构建：
+
+- 推送 `v*` 标签（如 `git tag v1.0.0 && git push origin v1.0.0`）或手动触发 workflow_dispatch；
+- 在 `windows-latest` 上构建 NSIS 安装包，并自动上传为 GitHub Release 附件；
+- 任意一次运行也可在 Actions 页面下载 artifact。
+
 ## 部署建议
 
 - 管理后台支持 Cloudflare D1 与 MySQL 双后端：Worker 使用 D1，Node.js 使用 MySQL。

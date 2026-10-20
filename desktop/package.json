@@ -1,0 +1,48 @@
+{
+  "name": "word-assistant",
+  "productName": "word助手",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Word 排版美化助手 桌面客户端",
+  "main": "main.js",
+  "author": "violet27chen",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.violet27chen.wordassistant",
+    "productName": "word助手",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "config.json",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "word助手",
+      "uninstallDisplayName": "word助手"
+    }
+  }
+}
