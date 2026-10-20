@@ -22,14 +22,10 @@
   --paper-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
-/* Fallback for environments where the boot script never runs. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #030712;
-    --foreground: #f3f4f6;
-  }
-}
-
+/* `data-theme` is the single source of truth — it is resolved from the saved
+   choice or the OS preference by the boot script before first paint. Do not
+   add a prefers-color-scheme fallback here: it would fight an explicit
+   light choice on dark-mode systems and leave the body dark. */
 [data-theme="dark"] {
   color-scheme: dark;
   --background: #030712;

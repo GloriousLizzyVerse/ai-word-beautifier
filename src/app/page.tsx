@@ -1666,7 +1666,7 @@ export default function Home() {
 
           {/* Right Column: Actions & Status */}
           <div className="w-full lg:w-[40%] lg:h-full lg:overflow-y-auto lg:pr-2 pb-6 flex flex-col hide-scrollbar">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col min-h-max lg:min-h-full">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col min-h-max lg:min-h-full shrink-0">
               <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 shrink-0">{locale === 'zh' ? '操作面板' : 'Actions'}</h2>
 
               <button
