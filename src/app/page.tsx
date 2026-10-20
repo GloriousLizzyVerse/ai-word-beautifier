@@ -256,7 +256,8 @@ export default function Home() {
   const [workingDir, setWorkingDir] = useState('');
   const [appMode, setAppMode] = useState<'doc' | 'agent'>('doc');
   const [agentInput, setAgentInput] = useState('');
-  const [agentMessages, setAgentMessages] = useState<{ role: 'user' | 'assistant'; content: string; savedPath?: string }[]>([]);
+  const [agentMessages, setAgentMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string; savedPath?: string }[]>([]);
+  const agentStreamId = useRef<string | null>(null);
   const [showAgentPreview, setShowAgentPreview] = useState(false);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceDoc[]>([]);
   const [desktopNotice, setDesktopNotice] = useState('');
@@ -1182,7 +1183,7 @@ export default function Home() {
     }
   };
 
-  const executeGenerate = async (payload: Record<string, unknown>, initialMsg: string, typingMsg: string) => {
+  const executeGenerate = async (payload: Record<string, unknown>, initialMsg: string, typingMsg: string, onDelta?: (full: string) => void) => {
     setIsFetching(true);
     setError(null);
     setRequiresLogin(false);
@@ -1229,11 +1230,13 @@ export default function Home() {
 
         const chunk = decoder.decode(value, { stream: true });
         fullTextRef.current += chunk;
+        onDelta?.(fullTextRef.current);
       }
 
       const trailingText = decoder.decode();
       if (trailingText) {
         fullTextRef.current += trailingText;
+        onDelta?.(fullTextRef.current);
       }
 
       // 生成完成后自动保存到历史记录（失败不影响生成结果）
@@ -1362,8 +1365,14 @@ export default function Home() {
       );
     }
 
-    setAgentMessages(prev => [...prev, { role: 'user', content: instruction }]);
+    const userId = crypto.randomUUID();
+    const assistantId = crypto.randomUUID();
+    setAgentMessages(prev => [...prev,
+      { id: userId, role: 'user', content: instruction },
+      { id: assistantId, role: 'assistant', content: '' },
+    ]);
     setAgentInput('');
+    agentStreamId.current = assistantId;
 
     const payload = {
       prompt: instruction,
@@ -1389,18 +1398,23 @@ export default function Home() {
       })),
     };
 
-    await executeGenerate(payload, text('analyzingText'), text('generatingText'));
+    await executeGenerate(payload, text('analyzingText'), text('generatingText'), (full) => {
+      setAgentMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: full } : m));
+    });
 
     const result = fullTextRef.current;
-    if (!result.trim()) return;
+    agentStreamId.current = null;
+    if (!result.trim()) {
+      // 生成失败/空结果：移除空助手气泡，避免残留空白气泡
+      setAgentMessages(prev => prev.filter(m => m.id !== assistantId));
+      return;
+    }
     const saved = isDesktopClient && workingDir
       ? await saveCurrentDocToWorkspace(undefined, result)
       : { ok: false, path: undefined };
-    setAgentMessages(prev => [...prev, {
-      role: 'assistant',
-      content: result,
-      savedPath: saved.ok ? saved.path : undefined,
-    }]);
+    setAgentMessages(prev => prev.map(m => m.id === assistantId
+      ? { ...m, content: result, savedPath: saved.ok ? saved.path : undefined }
+      : m));
   };
 
   const handleRefine = async (customPrompt?: string) => {
@@ -2039,8 +2053,8 @@ export default function Home() {
                     <p className="text-xs">{locale === 'zh' ? '生成结果会自动保存到当前工作目录。' : 'Results are saved to the current working folder automatically.'}</p>
                   </div>
                 ) : (
-                  agentMessages.map((msg, index) => (
-                    <div key={index} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  agentMessages.map((msg) => (
+                    <div key={msg.id} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                       <div className={cn(
                         'max-w-[82%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words',
                         msg.role === 'user'
@@ -2048,37 +2062,35 @@ export default function Home() {
                           : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-bl-md'
                       )}>
                         {msg.role === 'assistant' ? (
-                          <>
-                            <p className="line-clamp-6">{msg.content}</p>
-                            {msg.savedPath ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenWorkspaceFile(msg.savedPath!.split(/[\\/]/).pop() || '')}
-                                className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                              >
-                                <FileDown className="w-3.5 h-3.5" />
-                                {msg.savedPath.split(/[\\/]/).pop()}
-                              </button>
-                            ) : (
-                              <span className="mt-2 block text-xs text-gray-400 dark:text-gray-500">
-                                {locale === 'zh' ? '（未选择工作目录，未自动保存）' : '(No workspace selected, not saved)'}
-                              </span>
-                            )}
-                          </>
+                          msg.content ? (
+                            <>
+                              <p className="line-clamp-6">{msg.content}</p>
+                              {agentStreamId.current !== msg.id && (
+                                msg.savedPath ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenWorkspaceFile(msg.savedPath!.split(/[\\/]/).pop() || '')}
+                                    className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                                  >
+                                    <FileDown className="w-3.5 h-3.5" />
+                                    {msg.savedPath.split(/[\\/]/).pop()}
+                                  </button>
+                                ) : (
+                                  <span className="mt-2 block text-xs text-gray-400 dark:text-gray-500">
+                                    {locale === 'zh' ? '（未选择工作目录，未自动保存）' : '(No workspace selected, not saved)'}
+                                  </span>
+                                )
+                              )}
+                            </>
+                          ) : (
+                            <Loader2 className="w-4 h-4 animate-spin text-gray-400 dark:text-gray-500" />
+                          )
                         ) : (
                           msg.content
                         )}
                       </div>
                     </div>
                   ))
-                )}
-                {(isFetching || isTyping) && (
-                  <div className="flex justify-start">
-                    <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {statusMsg || text('generatingDefault')}
-                    </div>
-                  </div>
                 )}
               </div>
 
