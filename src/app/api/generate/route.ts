@@ -499,16 +499,22 @@ You must reference images by their ID using Markdown: ![alt text](IMAGE_ID)
 Example: ![Example image](${images[0].id})
 Available image IDs:\n`
       );
-      images.forEach((img: { id: string, base64: string }, idx: number) => {
-        textPrompt += l(`- 图片 ${idx + 1} 的ID为：${img.id}\n`, `- Image ${idx + 1} ID: ${img.id}\n`);
+      images.forEach((img: { id: string, base64: string, caption?: string, insertHint?: string }, idx: number) => {
+        const note = (img.caption || img.insertHint || '').trim();
+        textPrompt += l(
+          `- 图片 ${idx + 1} 的ID为：${img.id}${note ? `；教学说明：${note}` : ''}\n`,
+          `- Image ${idx + 1} ID: ${img.id}${note ? `; teaching note: ${note}` : ''}\n`
+        );
       });
       textPrompt += l(
         `\n注意：
 1. 只能使用上述提供的图片ID，绝对不能编造其他图片或使用外部链接。
-2. 绝对不要在文档中使用任何表情符号（Emoji）和图标。`,
+2. 绝对不要在文档中使用任何表情符号（Emoji）和图标。
+3. 若图片带有「教学说明 / 建议插入位置」，请将其内容整合进文档对应章节，并按建议位置插入该图片（标注图上的关键点已直接画在图中，无需文字重复描述）。`,
         `\nNotes:
 1. Only use the provided image IDs. Do not invent images or use external URLs.
-2. Never use emojis or decorative symbols.`
+2. Never use emojis or decorative symbols.
+3. If an image has a "teaching note / suggested placement", integrate it into the relevant section and insert the image near that position (annotations are already drawn on the image, so do not redescription them in text).`
       );
     }
 
